@@ -64,6 +64,7 @@ pub enum Command {
     },
     Stats,
     Download,
+    Verify,
     Mcp,
 }
 
@@ -207,6 +208,49 @@ pub fn run(cli: Cli) -> Result<()> {
                 .map_err(crate::core::error::MemAgentError::Config)?;
             println!("Model: {model_path}");
             println!("Tokenizer: {tokenizer_path}");
+        }
+        Command::Verify => {
+            println!("=== mem-agent ONNX Model Verification (ort) ===\n");
+
+            let (_model_path, _tokenizer_path) =
+                crate::download::ensure_model_downloaded()
+                    .map_err(crate::core::error::MemAgentError::Config)?;
+
+            println!("[1/2] Loading engine...");
+            let engine = crate::embed::engine::EmbeddingEngine::from_pretrained()
+                .map_err(crate::core::error::MemAgentError::Config)?;
+            println!("  ✅ Engine loaded (dim: {})", engine.dim());
+
+            println!("[2/2] Running inference...");
+            let query = "Hello world from mem-agent";
+            let start = std::time::Instant::now();
+            let vec = engine.embed_query(query)
+                .map_err(crate::core::error::MemAgentError::Config)?;
+            let elapsed = start.elapsed();
+
+            println!("  ✅ Inference: {:?}", elapsed);
+            println!("\n=== Result ===");
+            println!("  Query:        {query}");
+            println!("  Embedding dim: {}", vec.len());
+            println!("  First 5:      {:?}", &vec[..5]);
+            println!("  Last 5:       {:?}", &vec[vec.len()-5..]);
+            let norm: f32 = vec.iter().map(|x| x * x).sum::<f32>().sqrt();
+            println!("  L2 norm:      {:.6}", norm);
+
+            let doc = "Rust is a systems programming language";
+            let start = std::time::Instant::now();
+            let vec2 = engine.embed_document(doc)
+                .map_err(crate::core::error::MemAgentError::Config)?;
+            let elapsed2 = start.elapsed();
+
+            println!("\n  Doc:          {doc}");
+            println!("  Embedding dim: {}", vec2.len());
+            println!("  Inference:    {:?}", elapsed2);
+
+            let similarity: f32 = vec.iter().zip(vec2.iter()).map(|(a, b)| a * b).sum();
+            println!("  Similarity:   {:.6}", similarity);
+
+            println!("\n  ✅ Model hoạt động bình thường!");
         }
         Command::Mcp => {
             println!("Starting mem-agent MCP server...");

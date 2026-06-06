@@ -206,7 +206,7 @@ mod tests {
         insert_test_vectors(&conn, &ids);
 
         let engine =
-            EmbeddingEngine::new("", crate::embed::tokenizer_embed::make_test_tokenizer()).unwrap();
+            EmbeddingEngine::new("", crate::embed::tokenizer_embed::make_test_tokenizer());
         let mut hybrid = HybridSearch::new(engine);
         hybrid.load_vectors(&conn).unwrap();
 
@@ -217,7 +217,7 @@ mod tests {
     fn test_search_fts5_only() {
         let conn = setup_db();
         let engine =
-            EmbeddingEngine::new("", crate::embed::tokenizer_embed::make_test_tokenizer()).unwrap();
+            EmbeddingEngine::new("", crate::embed::tokenizer_embed::make_test_tokenizer());
         let mut hybrid = HybridSearch::new(engine);
         hybrid.fts5.build_index(&conn).unwrap();
 
@@ -264,7 +264,7 @@ mod tests {
         insert_test_vectors(&conn, &ids);
 
         let engine =
-            EmbeddingEngine::new("", crate::embed::tokenizer_embed::make_test_tokenizer()).unwrap();
+            EmbeddingEngine::new("", crate::embed::tokenizer_embed::make_test_tokenizer());
         let mut hybrid = HybridSearch::new(engine);
         hybrid.load_vectors(&conn).unwrap();
 
@@ -302,7 +302,7 @@ mod tests {
         insert_test_vectors(&conn, &ids);
 
         let engine =
-            EmbeddingEngine::new("", crate::embed::tokenizer_embed::make_test_tokenizer()).unwrap();
+            EmbeddingEngine::new("", crate::embed::tokenizer_embed::make_test_tokenizer());
         let mut hybrid = HybridSearch::new(engine);
         hybrid.build_indices(&conn).unwrap();
 
@@ -317,7 +317,7 @@ mod tests {
         insert_test_vectors(&conn, &ids);
 
         let engine =
-            EmbeddingEngine::new("", crate::embed::tokenizer_embed::make_test_tokenizer()).unwrap();
+            EmbeddingEngine::new("", crate::embed::tokenizer_embed::make_test_tokenizer());
         let mut hybrid = HybridSearch::new(engine);
         hybrid.build_indices(&conn).unwrap();
 

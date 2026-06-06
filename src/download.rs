@@ -1,60 +1,62 @@
 use std::path::PathBuf;
 
-use crate::core::config::{MODEL_DIR, MODEL_ONNX, TOKENIZER_PATH};
+use crate::core::config::{MODEL_DIR, TOKENIZER_PATH};
 
-const MODEL_ID: &str = "onnx-community/embeddinggemma-300m-ONNX";
-const ONNX_FILE: &str = "onnx/model.onnx";
-const ONNX_DATA_FILE: &str = "onnx/model.onnx_data";
-const TOKENIZER_FILE: &str = "tokenizer.json";
+const MODEL_REPO: &str = "onnx-community/embeddinggemma-300m-ONNX";
+const HF_BASE: &str = "https://huggingface.co";
+const MODEL_ONNX_FILE: &str = "models/embeddinggemma-300m-ONNX/onnx/model.onnx";
 
 pub fn ensure_model_downloaded() -> Result<(String, String), String> {
-    let model_dir = PathBuf::from(MODEL_DIR);
-    let model_onnx = PathBuf::from(MODEL_ONNX);
+    let model_file = PathBuf::from(MODEL_ONNX_FILE);
     let tokenizer_path = PathBuf::from(TOKENIZER_PATH);
 
-    if model_onnx.exists() && tokenizer_path.exists() {
-        return Ok((MODEL_ONNX.to_string(), TOKENIZER_PATH.to_string()));
+    if model_file.exists() && tokenizer_path.exists() {
+        return Ok((MODEL_ONNX_FILE.to_string(), TOKENIZER_PATH.to_string()));
     }
 
-    std::fs::create_dir_all(&model_dir)
-        .map_err(|e| format!("Cannot create model dir {model_dir:?}: {e}"))?;
-
-    let api = hf_hub::api::sync::Api::new()
-        .map_err(|e| format!("HF Hub error: {e}"))?;
-
-    let repo = api.model(MODEL_ID.to_string());
+    let model_dir = PathBuf::from(MODEL_DIR);
+    std::fs::create_dir_all(model_dir.join("onnx"))
+        .map_err(|e| format!("Create model dir: {e}"))?;
 
     println!("⬇ Downloading embeddinggemma-300m-ONNX from HuggingFace...");
 
-    let onnx_path = download_file(&repo, ONNX_FILE, MODEL_ONNX)?;
-    let _ = download_file(&repo, ONNX_DATA_FILE, &format!("{MODEL_ONNX}_data"));
+    download_hf("onnx/model.onnx", &model_file)?;
+    download_hf("onnx/model.onnx_data", &PathBuf::from(format!("{MODEL_ONNX_FILE}_data")))?;
+    download_hf("tokenizer.json", &tokenizer_path)?;
 
-    let tok_path = download_file(&repo, TOKENIZER_FILE, TOKENIZER_PATH)?;
+    println!("  Model ready at: {MODEL_ONNX_FILE}");
 
-    println!("  Model ready at: {MODEL_ONNX}");
-
-    Ok((onnx_path, tok_path))
+    Ok((MODEL_ONNX_FILE.to_string(), TOKENIZER_PATH.to_string()))
 }
 
-fn download_file(repo: &hf_hub::api::sync::ApiRepo, remote: &str, local: &str) -> Result<String, String> {
-    if std::path::Path::new(local).exists() {
-        return Ok(local.to_string());
+fn download_hf(remote: &str, dest: &PathBuf) -> Result<(), String> {
+    if dest.exists() {
+        return Ok(());
     }
 
-    if let Some(parent) = std::path::Path::new(local).parent() {
+    if let Some(parent) = dest.parent() {
         std::fs::create_dir_all(parent)
             .map_err(|e| format!("Create dir {parent:?}: {e}"))?;
     }
 
+    let url = format!("{HF_BASE}/{MODEL_REPO}/resolve/main/{remote}");
+
     println!("  Downloading {remote}...");
-    let cached = repo
-        .get(remote)
-        .map_err(|e| format!("Download {remote} failed: {e}"))?;
+    let client = reqwest::blocking::Client::new();
+    let response = client
+        .get(&url)
+        .header("User-Agent", "mem-agent/0.1")
+        .send()
+        .map_err(|e| format!("Download {remote}: {e}"))?
+        .error_for_status()
+        .map_err(|e| format!("HF error {remote}: {e}"))?;
 
-    if cached != std::path::Path::new(local) {
-        std::fs::copy(&cached, local)
-            .map_err(|e| format!("Copy {remote} to {local}: {e}"))?;
-    }
+    let bytes = response
+        .bytes()
+        .map_err(|e| format!("Read body {remote}: {e}"))?;
 
-    Ok(local.to_string())
+    std::fs::write(dest, bytes)
+        .map_err(|e| format!("Write {remote}: {e}"))?;
+
+    Ok(())
 }

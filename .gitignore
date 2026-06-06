@@ -7,3 +7,5 @@ models/
 *.bin
 .DS_Store
 .codegraph
+*.db-shm
+*.db-wal
