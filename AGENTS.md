@@ -135,7 +135,7 @@ unicode-segmentation = "1.11"
 //! Contiguous memory layout cho vectors
 //! Dùng Vec<[f32; DIM]> thay vì HashMap<String, Float32Array>
 
-pub const DEFAULT_DIM: usize = 384; // all-MiniLM-L6-v2
+pub const DEFAULT_DIM: usize = 768; // embeddinggemma-300m-ONNX
 
 #[derive(Clone, Debug)]
 pub struct VectorStore {
@@ -249,14 +249,11 @@ impl EmbeddingEngine {
 
 **Download model:**
 ```bash
-# all-MiniLM-L6-v2 ONNX (~22MB)
-curl -L -o models/all-MiniLM-L6-v2.onnx \
-  https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx
-curl -L -o models/tokenizer.json \
-  https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/main/tokenizer.json
+# embeddinggemma-300m-ONNX (~120MB, 768 dims)
+git clone https://huggingface.co/onnx-community/embeddinggemma-300m-ONNX models/embeddinggemma-300m-ONNX
+# Model files: models/embeddinggemma-300m-ONNX/onnx/model.onnx + model.onnx_data
+# Tokenizer: models/embeddinggemma-300m-ONNX/tokenizer.json
 ```
-
-Hoặc dùng `hf-hub` crate để download tự động.
 
 #### 2.2 Batch Pipeline (cho index rebuild)
 
@@ -592,8 +589,11 @@ mem-agent/
 ├── Cargo.toml
 ├── AGENTS.md                # ← này
 ├── models/
-│   ├── all-MiniLM-L6-v2.onnx      # Embedding model (~22MB)
-│   └── tokenizer.json             # HuggingFace tokenizer
+│   ├── embeddinggemma-300m-ONNX/  # Embedding model (~120MB, 768d)
+│   │   ├── onnx/
+│   │   │   ├── model.onnx
+│   │   │   └── model.onnx_data
+│   │   └── tokenizer.json
 ├── src/
 │   ├── main.rs             # CLI entry (đã có, mở rộng)
 │   ├── db.rs               # SQLite + FTS5 (đã có)

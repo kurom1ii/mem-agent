@@ -1,9 +1,10 @@
-pub const DEFAULT_DIM: usize = 384;
+pub const DEFAULT_DIM: usize = 768;
 pub const DB_PATH: &str = "memories.db";
 pub const INDEX_PATH: &str = "index.hnsw.bin";
 pub const VECTORS_PATH: &str = "vectors.bin";
-pub const MODEL_PATH: &str = "models/all-MiniLM-L6-v2.onnx";
-pub const TOKENIZER_PATH: &str = "models/tokenizer.json";
+pub const MODEL_DIR: &str = "models/embeddinggemma-300m-ONNX";
+pub const MODEL_ONNX: &str = "models/embeddinggemma-300m-ONNX/onnx/model.onnx";
+pub const TOKENIZER_PATH: &str = "models/embeddinggemma-300m-ONNX/tokenizer.json";
 pub const K_RRF: f64 = 60.0;
 pub const W_FTS: f64 = 0.4;
 pub const W_VEC: f64 = 0.6;

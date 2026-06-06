@@ -4,6 +4,9 @@ use candle_onnx::simple_eval;
 
 use crate::embed::tokenizer_embed::TokenizerWrapper;
 
+const QUERY_PREFIX: &str = "task: search result | query: ";
+const DOC_PREFIX: &str = "title: none | text: ";
+
 pub struct EmbeddingEngine {
     model_path: String,
     tokenizer: TokenizerWrapper,
@@ -14,7 +17,7 @@ struct EmbeddingSession {
     tokenizer: TokenizerWrapper,
     device: Device,
     input_names: Vec<String>,
-    output_names: Vec<String>,
+    output_name: String,
 }
 
 impl EmbeddingEngine {
@@ -29,46 +32,69 @@ impl EmbeddingEngine {
         let model = candle_onnx::read_file(&self.model_path)
             .map_err(|e| format!("Failed to load ONNX model: {e}"))?;
 
-        let (input_names, output_names) = Self::extract_io_names(&model);
+        let input_names: Vec<String> = model
+            .graph
+            .as_ref()
+            .map(|g| g.input.iter().map(|i| i.name.clone()).collect())
+            .unwrap_or_default();
+
+        let output_name = model
+            .graph
+            .as_ref()
+            .and_then(|g| g.output.first())
+            .map(|o| o.name.clone())
+            .unwrap_or_else(|| "sentence_embedding".into());
 
         Ok(EmbeddingSession {
             model,
             tokenizer: self.tokenizer.clone(),
             device: Device::Cpu,
             input_names,
-            output_names,
+            output_name,
         })
     }
 
-    fn extract_io_names(model: &candle_onnx::onnx::ModelProto) -> (Vec<String>, Vec<String>) {
-        let input_names: Vec<String> = model
-            .graph
-            .as_ref()
-            .map(|g| g.input.iter().map(|i| i.name.clone()).collect())
-            .unwrap_or_else(|| vec!["input_ids".into(), "attention_mask".into(), "token_type_ids".into()]);
+    pub fn embed_query(&self, text: &str) -> Result<Vec<f32>, String> {
+        let prefixed = format!("{QUERY_PREFIX}{text}");
+        self.embed(&prefixed)
+    }
 
-        let output_names: Vec<String> = model
-            .graph
-            .as_ref()
-            .map(|g| g.output.iter().map(|o| o.name.clone()).collect())
-            .unwrap_or_else(|| vec!["last_hidden_state".into()]);
-
-        (input_names, output_names)
+    pub fn embed_document(&self, text: &str) -> Result<Vec<f32>, String> {
+        let prefixed = format!("{DOC_PREFIX}{text}");
+        self.embed(&prefixed)
     }
 
     pub fn embed(&self, text: &str) -> Result<Vec<f32>, String> {
         let sess = self.session()?;
-        sess.embed_single(text)
+        sess.embed_text(text)
     }
 
     pub fn embed_batch(&self, texts: &[&str]) -> Result<Vec<Vec<f32>>, String> {
         let sess = self.session()?;
         sess.embed_batch(texts)
     }
+
+    pub fn embed_query_batch(&self, texts: &[&str]) -> Result<Vec<Vec<f32>>, String> {
+        let prefixed: Vec<String> = texts
+            .iter()
+            .map(|t| format!("{QUERY_PREFIX}{t}"))
+            .collect();
+        let refs: Vec<&str> = prefixed.iter().map(|s| s.as_str()).collect();
+        self.embed_batch(&refs)
+    }
+
+    pub fn embed_document_batch(&self, texts: &[&str]) -> Result<Vec<Vec<f32>>, String> {
+        let prefixed: Vec<String> = texts
+            .iter()
+            .map(|t| format!("{DOC_PREFIX}{t}"))
+            .collect();
+        let refs: Vec<&str> = prefixed.iter().map(|s| s.as_str()).collect();
+        self.embed_batch(&refs)
+    }
 }
 
 impl EmbeddingSession {
-    pub fn embed_single(&self, text: &str) -> Result<Vec<f32>, String> {
+    pub fn embed_text(&self, text: &str) -> Result<Vec<f32>, String> {
         let token_ids = self.tokenizer.encode(text)?;
         let seq_len = token_ids.len();
 
@@ -79,31 +105,34 @@ impl EmbeddingSession {
         let mask_tensor = Tensor::from_slice(&mask_data, (1, seq_len), &self.device)
             .map_err(|e| format!("Tensor error: {e}"))?;
 
-        let ttype_data: Vec<f32> = vec![0.0f32; seq_len];
-        let ttype_tensor = Tensor::from_slice(&ttype_data, (1, seq_len), &self.device)
-            .map_err(|e| format!("Tensor error: {e}"))?;
-
         let mut inputs = HashMap::new();
-        if self.input_names.len() >= 3 {
+        if self.input_names.len() >= 2 {
             inputs.insert(self.input_names[0].clone(), ids_tensor);
             inputs.insert(self.input_names[1].clone(), mask_tensor.clone());
-            inputs.insert(self.input_names[2].clone(), ttype_tensor);
         } else {
             inputs.insert("input_ids".into(), ids_tensor);
             inputs.insert("attention_mask".into(), mask_tensor.clone());
-            inputs.insert("token_type_ids".into(), ttype_tensor);
         }
 
         let outputs = simple_eval(&self.model, inputs)
             .map_err(|e| format!("Inference error: {e}"))?;
 
-        let output_name = self.output_names.first().cloned().unwrap_or_else(|| "last_hidden_state".into());
         let hidden = outputs
-            .get(&output_name)
+            .get(&self.output_name)
+            .or_else(|| outputs.values().next())
             .ok_or_else(|| "No output tensor".to_string())?;
 
-        let pooled = self.mean_pool_single(hidden, &mask_tensor)?;
-        self.l2_normalize(&pooled)
+        if hidden.rank() == 2 && hidden.dims()[0] == 1 {
+            let vec: Vec<f32> = hidden
+                .get(0)
+                .map_err(|e| format!("Slice error: {e}"))?
+                .to_vec1()
+                .map_err(|e| format!("To vec error: {e}"))?;
+            self.l2_normalize_vec(vec)
+        } else {
+            let pooled = self.mean_pool_single(hidden, &mask_tensor)?;
+            self.l2_normalize(&pooled)
+        }
     }
 
     pub fn embed_batch(&self, texts: &[&str]) -> Result<Vec<Vec<f32>>, String> {
@@ -126,30 +155,25 @@ impl EmbeddingSession {
             .map_err(|e| format!("Tensor error: {e}"))?;
         let mask_tensor = Tensor::from_slice(&masks, (n, max_len), &self.device)
             .map_err(|e| format!("Tensor error: {e}"))?;
-        let ttype_data = vec![0.0f32; n * max_len];
-        let ttype_tensor = Tensor::from_slice(&ttype_data, (n, max_len), &self.device)
-            .map_err(|e| format!("Tensor error: {e}"))?;
 
         let mut inputs = HashMap::new();
-        if self.input_names.len() >= 3 {
+        if self.input_names.len() >= 2 {
             inputs.insert(self.input_names[0].clone(), ids_tensor);
             inputs.insert(self.input_names[1].clone(), mask_tensor.clone());
-            inputs.insert(self.input_names[2].clone(), ttype_tensor);
         } else {
             inputs.insert("input_ids".into(), ids_tensor);
             inputs.insert("attention_mask".into(), mask_tensor.clone());
-            inputs.insert("token_type_ids".into(), ttype_tensor);
         }
 
         let outputs = simple_eval(&self.model, inputs)
             .map_err(|e| format!("Batch inference error: {e}"))?;
 
-        let output_name = self.output_names.first().cloned().unwrap_or_else(|| "last_hidden_state".into());
         let hidden = outputs
-            .get(&output_name)
+            .get(&self.output_name)
+            .or_else(|| outputs.values().next())
             .ok_or_else(|| "No output tensor".to_string())?;
 
-        self.mean_pool_batch(hidden, &mask_tensor, n, max_len)
+        self.mean_pool_batch(hidden, &mask_tensor, n)
     }
 
     fn mean_pool_single(&self, hidden: &Tensor, mask: &Tensor) -> Result<Tensor, String> {
@@ -182,7 +206,6 @@ impl EmbeddingSession {
         hidden: &Tensor,
         mask: &Tensor,
         n: usize,
-        _max_len: usize,
     ) -> Result<Vec<Vec<f32>>, String> {
         let mask_expanded = mask
             .unsqueeze(2)
@@ -243,7 +266,7 @@ mod tests {
             tokenizer: crate::embed::tokenizer_embed::make_test_tokenizer(),
             device,
             input_names: vec![],
-            output_names: vec![],
+            output_name: "sentence_embedding".into(),
         };
         let result = sess.l2_normalize(&t_flat).unwrap();
         assert!((result[0] - 0.6).abs() < 0.01);

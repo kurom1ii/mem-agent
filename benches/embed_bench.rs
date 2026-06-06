@@ -1,5 +1,9 @@
 fn main() {
-    println!("Embed benchmarks - requires ONNX model download first.");
-    println!("Download all-MiniLM-L6-v2 model to models/ directory, then:");
+    println!("Embed benchmarks - requires embeddinggemma-300m-ONNX model.");
+    println!();
+    println!("Download the model:");
+    println!("  git clone https://huggingface.co/onnx-community/embeddinggemma-300m-ONNX models/embeddinggemma-300m-ONNX");
+    println!();
+    println!("Then run:");
     println!("  cargo bench --bench embed_bench");
 }

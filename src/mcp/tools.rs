@@ -1,6 +1,4 @@
-use crate::mcp::protocol::{
-    CallToolParams, JsonRpcResponse, ToolDefinition,
-};
+use crate::mcp::protocol::{CallToolParams, JsonRpcResponse, ToolDefinition};
 
 pub fn list_tools_definitions() -> Vec<ToolDefinition> {
     vec![
