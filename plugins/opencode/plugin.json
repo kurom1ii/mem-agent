@@ -1,0 +1,12 @@
+{
+  "name": "mem-agent",
+  "version": "0.1.0",
+  "description": "OpenCode plugin for mem-agent — Rust persistent memory engine with hybrid search (BM25 + SIMD + ONNX). Skills: remember, recall, forget, session-history, recap, handoff.",
+  "author": {
+    "name": "kurom1ii",
+    "url": "https://github.com/kurom1ii"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/kurom1ii/mem-agent",
+  "repository": "https://github.com/kurom1ii/mem-agent"
+}

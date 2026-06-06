@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "mem-agent": {
+      "command": "mem-agent",
+      "args": ["mcp"],
+      "env": {}
+    }
+  }
+}
