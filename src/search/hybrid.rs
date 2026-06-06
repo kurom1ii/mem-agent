@@ -33,7 +33,7 @@ impl HybridSearch {
         let query_vector = self
             .embed
             .embed(query)
-            .map_err(|e| MemAgentError::Embed(e))?;
+            .map_err(MemAgentError::Embed)?;
 
         let fts_results = self.fts5.search(conn, query, limit * 3)?;
 
@@ -85,7 +85,7 @@ impl HybridSearch {
         let query_vector = self
             .embed
             .embed(query)
-            .map_err(|e| MemAgentError::Embed(e))?;
+            .map_err(MemAgentError::Embed)?;
 
         let vec_hits = exact_knn_single(
             &query_vector,
@@ -129,7 +129,8 @@ impl HybridSearch {
                 memory_id: entry.memory_id,
                 created_at: String::new(),
             };
-            self.vector_store.insert(entry.memory_id, entry.vector, meta)?;
+            self.vector_store
+                .insert(entry.memory_id, entry.vector, meta)?;
         }
 
         Ok(())
@@ -158,11 +159,23 @@ mod tests {
         init_db(&conn).unwrap();
 
         let entries = [
-            ("Rust Programming", "Rust is a systems programming language", "rust"),
+            (
+                "Rust Programming",
+                "Rust is a systems programming language",
+                "rust",
+            ),
             ("Python Guide", "Python is great for data science", "python"),
-            ("Async Rust", "Rust async programming with tokio", "rust,async"),
+            (
+                "Async Rust",
+                "Rust async programming with tokio",
+                "rust,async",
+            ),
             ("JavaScript", "JavaScript runs in the browser", "javascript"),
-            ("Memory Safety", "Rust guarantees memory safety without GC", "rust,memory"),
+            (
+                "Memory Safety",
+                "Rust guarantees memory safety without GC",
+                "rust,memory",
+            ),
         ];
 
         for (title, content, tags) in entries {
@@ -192,8 +205,8 @@ mod tests {
         let ids: Vec<i64> = (1..=5).collect();
         insert_test_vectors(&conn, &ids);
 
-        let engine = EmbeddingEngine::new("", crate::embed::tokenizer_embed::make_test_tokenizer())
-            .unwrap();
+        let engine =
+            EmbeddingEngine::new("", crate::embed::tokenizer_embed::make_test_tokenizer()).unwrap();
         let mut hybrid = HybridSearch::new(engine);
         hybrid.load_vectors(&conn).unwrap();
 
@@ -203,8 +216,8 @@ mod tests {
     #[test]
     fn test_search_fts5_only() {
         let conn = setup_db();
-        let engine = EmbeddingEngine::new("", crate::embed::tokenizer_embed::make_test_tokenizer())
-            .unwrap();
+        let engine =
+            EmbeddingEngine::new("", crate::embed::tokenizer_embed::make_test_tokenizer()).unwrap();
         let mut hybrid = HybridSearch::new(engine);
         hybrid.fts5.build_index(&conn).unwrap();
 
@@ -221,9 +234,18 @@ mod tests {
     fn test_rrf_fuse_in_hybrid_context() {
         let fts_pairs: Vec<(i64, f64)> = vec![(1, -2.0), (2, -1.5), (5, -1.0)];
         let vec_hits = vec![
-            SearchHit { memory_id: 2, score: 0.95 },
-            SearchHit { memory_id: 5, score: 0.70 },
-            SearchHit { memory_id: 3, score: 0.50 },
+            SearchHit {
+                memory_id: 2,
+                score: 0.95,
+            },
+            SearchHit {
+                memory_id: 5,
+                score: 0.70,
+            },
+            SearchHit {
+                memory_id: 3,
+                score: 0.50,
+            },
         ];
 
         let fused = rrf_fuse(&fts_pairs, &vec_hits, 5);
@@ -241,13 +263,18 @@ mod tests {
         let ids: Vec<i64> = (1..=5).collect();
         insert_test_vectors(&conn, &ids);
 
-        let engine = EmbeddingEngine::new("", crate::embed::tokenizer_embed::make_test_tokenizer())
-            .unwrap();
+        let engine =
+            EmbeddingEngine::new("", crate::embed::tokenizer_embed::make_test_tokenizer()).unwrap();
         let mut hybrid = HybridSearch::new(engine);
         hybrid.load_vectors(&conn).unwrap();
 
         let query_vec = vec![1.0f32, 0.0, 0.0, 0.0];
-        let hits = exact_knn_single(&query_vec, &hybrid.vector_store.vectors, &hybrid.vector_store.ids, 3);
+        let hits = exact_knn_single(
+            &query_vec,
+            &hybrid.vector_store.vectors,
+            &hybrid.vector_store.ids,
+            3,
+        );
 
         assert!(!hits.is_empty());
         assert_eq!(hits[0].memory_id, 1);
@@ -274,8 +301,8 @@ mod tests {
         let ids: Vec<i64> = (1..=5).collect();
         insert_test_vectors(&conn, &ids);
 
-        let engine = EmbeddingEngine::new("", crate::embed::tokenizer_embed::make_test_tokenizer())
-            .unwrap();
+        let engine =
+            EmbeddingEngine::new("", crate::embed::tokenizer_embed::make_test_tokenizer()).unwrap();
         let mut hybrid = HybridSearch::new(engine);
         hybrid.build_indices(&conn).unwrap();
 
@@ -289,8 +316,8 @@ mod tests {
         let ids: Vec<i64> = (1..=5).collect();
         insert_test_vectors(&conn, &ids);
 
-        let engine = EmbeddingEngine::new("", crate::embed::tokenizer_embed::make_test_tokenizer())
-            .unwrap();
+        let engine =
+            EmbeddingEngine::new("", crate::embed::tokenizer_embed::make_test_tokenizer()).unwrap();
         let mut hybrid = HybridSearch::new(engine);
         hybrid.build_indices(&conn).unwrap();
 

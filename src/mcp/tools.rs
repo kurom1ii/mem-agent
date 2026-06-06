@@ -166,7 +166,9 @@ fn handle_memory_search(
                     Ok(mem) => {
                         output.push_str(&format!(
                             "[ID:{}] {} (score: {:.4})\n  {}\n\n",
-                            mem.id, mem.title, score,
+                            mem.id,
+                            mem.title,
+                            score,
                             &mem.content[..mem.content.len().min(200)],
                         ));
                     }
@@ -186,7 +188,9 @@ fn handle_memory_search(
                     Ok(mem) => {
                         output.push_str(&format!(
                             "[ID:{}] {} (score: {:.4})\n  {}\n\n",
-                            mem.id, mem.title, score,
+                            mem.id,
+                            mem.title,
+                            score,
                             &mem.content[..mem.content.len().min(200)],
                         ));
                     }
@@ -229,8 +233,7 @@ fn handle_memory_get(
         .as_i64()
         .ok_or_else(|| "Missing 'id'".to_string())?;
 
-    let mem = crate::db::ops::get_memory(conn, id)
-        .map_err(|e| format!("Get error: {e}"))?;
+    let mem = crate::db::ops::get_memory(conn, id).map_err(|e| format!("Get error: {e}"))?;
     Ok(serde_json::to_string_pretty(&mem).unwrap_or_else(|_| format!("{mem:?}")))
 }
 
@@ -242,8 +245,8 @@ fn handle_memory_list(
     let args = params.arguments.as_ref().unwrap_or(&default_args);
     let limit = args["limit"].as_u64().unwrap_or(20) as usize;
 
-    let mems = crate::db::ops::list_memories(conn, limit)
-        .map_err(|e| format!("List error: {e}"))?;
+    let mems =
+        crate::db::ops::list_memories(conn, limit).map_err(|e| format!("List error: {e}"))?;
     let mut output = String::new();
     for mem in &mems {
         output.push_str(&format!(
@@ -264,8 +267,8 @@ fn handle_memory_delete(
         .as_i64()
         .ok_or_else(|| "Missing 'id'".to_string())?;
 
-    let deleted = crate::db::ops::delete_memory(conn, id)
-        .map_err(|e| format!("Delete error: {e}"))?;
+    let deleted =
+        crate::db::ops::delete_memory(conn, id).map_err(|e| format!("Delete error: {e}"))?;
     if deleted {
         Ok(format!("Memory {id} deleted"))
     } else {
@@ -274,8 +277,7 @@ fn handle_memory_delete(
 }
 
 fn handle_index_stats(conn: &rusqlite::Connection) -> Result<String, String> {
-    let stats = crate::db::ops::get_stats(conn)
-        .map_err(|e| format!("Stats error: {e}"))?;
+    let stats = crate::db::ops::get_stats(conn).map_err(|e| format!("Stats error: {e}"))?;
     Ok(serde_json::to_string_pretty(&serde_json::json!({
         "memory_count": stats.memory_count,
         "vector_count": stats.vector_count,

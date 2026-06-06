@@ -113,8 +113,11 @@ mod tests {
             .unwrap();
         assert_eq!(fts_row.0, row.0);
 
-        conn.execute("DELETE FROM memories WHERE id = ?1", rusqlite::params![row.0])
-            .unwrap();
+        conn.execute(
+            "DELETE FROM memories WHERE id = ?1",
+            rusqlite::params![row.0],
+        )
+        .unwrap();
 
         let fts_count: i64 = conn
             .query_row(

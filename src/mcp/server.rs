@@ -94,9 +94,7 @@ impl McpServer {
                                 response
                             }
                         }
-                        Err(e) => {
-                            JsonRpcResponse::internal_error(request.id.clone(), &e)
-                        }
+                        Err(e) => JsonRpcResponse::internal_error(request.id.clone(), &e),
                     },
                     Err(e) => JsonRpcResponse::internal_error(
                         request.id.clone(),

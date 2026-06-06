@@ -145,7 +145,10 @@ mod tests {
     #[test]
     fn test_add_and_search_single_doc() {
         let mut idx = Bm25Index::new();
-        idx.add_document(0, &make_tokens("the quick brown fox jumped over the lazy dog"));
+        idx.add_document(
+            0,
+            &make_tokens("the quick brown fox jumped over the lazy dog"),
+        );
         let results = idx.search(&make_tokens("quick brown fox"), 10);
         assert!(!results.is_empty());
         assert_eq!(results[0].0, 0);
@@ -156,9 +159,18 @@ mod tests {
     fn test_search_multiple_docs() {
         let mut idx = Bm25Index::new();
         idx.add_document(0, &make_tokens("rust is a systems programming language"));
-        idx.add_document(1, &make_tokens("python is great for data science and machine learning"));
-        idx.add_document(2, &make_tokens("javascript runs in the browser and on the server with nodejs"));
-        idx.add_document(3, &make_tokens("rust is fast and memory safe with zero cost abstractions"));
+        idx.add_document(
+            1,
+            &make_tokens("python is great for data science and machine learning"),
+        );
+        idx.add_document(
+            2,
+            &make_tokens("javascript runs in the browser and on the server with nodejs"),
+        );
+        idx.add_document(
+            3,
+            &make_tokens("rust is fast and memory safe with zero cost abstractions"),
+        );
 
         let results = idx.search(&make_tokens("rust programming systems"), 5);
         assert!(!results.is_empty());
@@ -198,7 +210,10 @@ mod tests {
     fn test_idf_rarer_term_scores_higher() {
         let mut idx = Bm25Index::new();
         idx.add_document(0, &make_tokens("rare unique specific term appears once"));
-        idx.add_document(1, &make_tokens("common term appears everywhere common term"));
+        idx.add_document(
+            1,
+            &make_tokens("common term appears everywhere common term"),
+        );
         idx.add_document(2, &make_tokens("common term also here"));
 
         let score_rare = idx.score(0, &make_tokens("unique"));
@@ -243,9 +258,7 @@ mod tests {
         idx.add_document(0, &make_tokens("rust programming"));
         idx.add_document(1, &make_tokens("python data"));
 
-        let new_docs: Vec<(usize, Vec<String>)> = vec![
-            (2, make_tokens("rust concurrency async")),
-        ];
+        let new_docs: Vec<(usize, Vec<String>)> = vec![(2, make_tokens("rust concurrency async"))];
 
         let results = idx.search_with_docs(&make_tokens("rust concurrency"), &new_docs, 5);
         assert!(!results.is_empty());
@@ -269,7 +282,10 @@ mod tests {
     fn test_limit_truncation() {
         let mut idx = Bm25Index::new();
         for i in 0..5 {
-            idx.add_document(i, &make_tokens(&format!("unique rare term doc number {}", i)));
+            idx.add_document(
+                i,
+                &make_tokens(&format!("unique rare term doc number {}", i)),
+            );
         }
         let results = idx.search(&make_tokens("unique rare"), 2);
         assert_eq!(results.len(), 2);

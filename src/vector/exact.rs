@@ -1,7 +1,7 @@
-use rayon::prelude::*;
 use crate::core::types::SearchHit;
 use crate::vector::distance::cosine;
 use crate::vector::store::VectorStore;
+use rayon::prelude::*;
 
 pub fn exact_knn(query: &[f32], store: &VectorStore, k: usize) -> Vec<SearchHit> {
     let n = store.len();
@@ -21,7 +21,8 @@ pub fn exact_knn(query: &[f32], store: &VectorStore, k: usize) -> Vec<SearchHit>
         .collect();
 
     let mut with_indices: Vec<(usize, f32)> = scores;
-    with_indices.sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    with_indices
+        .sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
     with_indices.truncate(effective_k);
 
     with_indices
@@ -33,7 +34,12 @@ pub fn exact_knn(query: &[f32], store: &VectorStore, k: usize) -> Vec<SearchHit>
         .collect()
 }
 
-pub fn exact_knn_single(query: &[f32], vectors: &[Vec<f32>], ids: &[i64], k: usize) -> Vec<SearchHit> {
+pub fn exact_knn_single(
+    query: &[f32],
+    vectors: &[Vec<f32>],
+    ids: &[i64],
+    k: usize,
+) -> Vec<SearchHit> {
     let n = vectors.len();
     if n == 0 || k == 0 {
         return Vec::new();
@@ -50,7 +56,8 @@ pub fn exact_knn_single(query: &[f32], vectors: &[Vec<f32>], ids: &[i64], k: usi
         .collect();
 
     let mut with_indices = scores;
-    with_indices.sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    with_indices
+        .sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
     with_indices.truncate(effective_k);
 
     with_indices
@@ -74,13 +81,17 @@ mod tests {
             created_at: String::new(),
         };
 
-        store.insert(1, vec![1.0, 0.0, 0.0, 0.0], meta.clone()).unwrap();
+        store
+            .insert(1, vec![1.0, 0.0, 0.0, 0.0], meta.clone())
+            .unwrap();
 
         let meta = VectorMeta {
             memory_id: 1,
             created_at: String::new(),
         };
-        store.insert(2, vec![0.0, 1.0, 0.0, 0.0], meta.clone()).unwrap();
+        store
+            .insert(2, vec![0.0, 1.0, 0.0, 0.0], meta.clone())
+            .unwrap();
 
         let meta = VectorMeta {
             memory_id: 2,

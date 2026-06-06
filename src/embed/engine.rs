@@ -1,6 +1,6 @@
-use std::collections::HashMap;
 use candle_core::{Device, Tensor};
 use candle_onnx::simple_eval;
+use std::collections::HashMap;
 
 use crate::embed::tokenizer_embed::TokenizerWrapper;
 
@@ -75,19 +75,13 @@ impl EmbeddingEngine {
     }
 
     pub fn embed_query_batch(&self, texts: &[&str]) -> Result<Vec<Vec<f32>>, String> {
-        let prefixed: Vec<String> = texts
-            .iter()
-            .map(|t| format!("{QUERY_PREFIX}{t}"))
-            .collect();
+        let prefixed: Vec<String> = texts.iter().map(|t| format!("{QUERY_PREFIX}{t}")).collect();
         let refs: Vec<&str> = prefixed.iter().map(|s| s.as_str()).collect();
         self.embed_batch(&refs)
     }
 
     pub fn embed_document_batch(&self, texts: &[&str]) -> Result<Vec<Vec<f32>>, String> {
-        let prefixed: Vec<String> = texts
-            .iter()
-            .map(|t| format!("{DOC_PREFIX}{t}"))
-            .collect();
+        let prefixed: Vec<String> = texts.iter().map(|t| format!("{DOC_PREFIX}{t}")).collect();
         let refs: Vec<&str> = prefixed.iter().map(|s| s.as_str()).collect();
         self.embed_batch(&refs)
     }
@@ -114,8 +108,8 @@ impl EmbeddingSession {
             inputs.insert("attention_mask".into(), mask_tensor.clone());
         }
 
-        let outputs = simple_eval(&self.model, inputs)
-            .map_err(|e| format!("Inference error: {e}"))?;
+        let outputs =
+            simple_eval(&self.model, inputs).map_err(|e| format!("Inference error: {e}"))?;
 
         let hidden = outputs
             .get(&self.output_name)
@@ -165,8 +159,8 @@ impl EmbeddingSession {
             inputs.insert("attention_mask".into(), mask_tensor.clone());
         }
 
-        let outputs = simple_eval(&self.model, inputs)
-            .map_err(|e| format!("Batch inference error: {e}"))?;
+        let outputs =
+            simple_eval(&self.model, inputs).map_err(|e| format!("Batch inference error: {e}"))?;
 
         let hidden = outputs
             .get(&self.output_name)
@@ -184,13 +178,9 @@ impl EmbeddingSession {
         let weighted = hidden
             .broadcast_mul(&mask_expanded)
             .map_err(|e| format!("Mul error: {e}"))?;
-        let summed = weighted
-            .sum(1)
-            .map_err(|e| format!("Sum error: {e}"))?;
+        let summed = weighted.sum(1).map_err(|e| format!("Sum error: {e}"))?;
 
-        let mask_sum = mask
-            .sum_all()
-            .map_err(|e| format!("Sum error: {e}"))?;
+        let mask_sum = mask.sum_all().map_err(|e| format!("Sum error: {e}"))?;
 
         let mask_sum_reshaped = mask_sum
             .unsqueeze(0)
@@ -198,7 +188,7 @@ impl EmbeddingSession {
 
         summed
             .broadcast_div(&mask_sum_reshaped)
-            .map_err(|e| format!("Div error: {e}").into())
+            .map_err(|e| format!("Div error: {e}"))
     }
 
     fn mean_pool_batch(
@@ -214,35 +204,29 @@ impl EmbeddingSession {
         let weighted = hidden
             .broadcast_mul(&mask_expanded)
             .map_err(|e| format!("Mul error: {e}"))?;
-        let summed = weighted
-            .sum(1)
-            .map_err(|e| format!("Sum error: {e}"))?;
+        let summed = weighted.sum(1).map_err(|e| format!("Sum error: {e}"))?;
 
-        let mask_sum = mask
-            .sum(1)
-            .map_err(|e| format!("Sum error: {e}"))?;
+        let mask_sum = mask.sum(1).map_err(|e| format!("Sum error: {e}"))?;
 
         let summed_div = summed
-            .broadcast_div(&mask_sum.unsqueeze(1).map_err(|e| format!("Reshape error: {e}"))?)
+            .broadcast_div(
+                &mask_sum
+                    .unsqueeze(1)
+                    .map_err(|e| format!("Reshape error: {e}"))?,
+            )
             .map_err(|e| format!("Div error: {e}"))?;
 
         (0..n)
             .map(|i| {
-                let row = summed_div
-                    .get(i)
-                    .map_err(|e| format!("Slice error: {e}"))?;
-                let vec: Vec<f32> = row
-                    .to_vec1()
-                    .map_err(|e| format!("To vec error: {e}"))?;
+                let row = summed_div.get(i).map_err(|e| format!("Slice error: {e}"))?;
+                let vec: Vec<f32> = row.to_vec1().map_err(|e| format!("To vec error: {e}"))?;
                 self.l2_normalize_vec(vec)
             })
             .collect()
     }
 
     fn l2_normalize(&self, tensor: &Tensor) -> Result<Vec<f32>, String> {
-        let vec: Vec<f32> = tensor
-            .to_vec1()
-            .map_err(|e| format!("To vec error: {e}"))?;
+        let vec: Vec<f32> = tensor.to_vec1().map_err(|e| format!("To vec error: {e}"))?;
         self.l2_normalize_vec(vec)
     }
 

@@ -3,6 +3,8 @@ use std::collections::HashMap;
 use crate::core::config::{K_RRF, W_FTS, W_VEC};
 use crate::core::types::{Memory, SearchHit, SearchResult};
 
+type RankEntry = (Option<(usize, f64)>, Option<(usize, f64)>);
+
 /// Fuse FTS5 and vector search results using Reciprocal Rank Fusion (RRF).
 ///
 /// Each document's combined score:
@@ -16,8 +18,7 @@ pub fn rrf_fuse(
 ) -> Vec<SearchResult> {
     let penalty_rank = (limit * 3) as f64;
 
-    let mut doc_map: HashMap<i64, (Option<(usize, f64)>, Option<(usize, f64)>)> =
-        HashMap::new();
+    let mut doc_map: HashMap<i64, RankEntry> = HashMap::new();
 
     for (rank, (id, score)) in fts_results.iter().enumerate() {
         doc_map
@@ -41,8 +42,7 @@ pub fn rrf_fuse(
             let vec_rank = vec.map(|(r, _)| r as f64).unwrap_or(penalty_rank);
             let vec_score = vec.map(|(_, s)| s).unwrap_or(0.0);
 
-            let combined =
-                W_FTS * (1.0 / (K_RRF + fts_rank)) + W_VEC * (1.0 / (K_RRF + vec_rank));
+            let combined = W_FTS * (1.0 / (K_RRF + fts_rank)) + W_VEC * (1.0 / (K_RRF + vec_rank));
 
             (*id, combined, fts_score, vec_score)
         })
@@ -154,8 +154,7 @@ mod tests {
         let fused = rrf_fuse(&fts_results, &vec_results, 10);
         assert_eq!(fused.len(), 1);
         assert_eq!(fused[0].memory.id, 1);
-        let expected =
-            W_FTS * (1.0 / (K_RRF + 1.0)) + W_VEC * (1.0 / (K_RRF + 1.0));
+        let expected = W_FTS * (1.0 / (K_RRF + 1.0)) + W_VEC * (1.0 / (K_RRF + 1.0));
         assert!((fused[0].score - expected).abs() < 0.0001);
     }
 

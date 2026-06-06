@@ -81,8 +81,8 @@ pub fn generate_random_samples(conn: &Connection, count: usize) -> Result<Vec<i6
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::schema::get_connection;
     use crate::db::ops::get_stats;
+    use crate::db::schema::get_connection;
 
     #[test]
     fn test_generate_samples() {

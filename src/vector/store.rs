@@ -45,12 +45,7 @@ impl VectorStore {
         self.dim
     }
 
-    pub fn insert(
-        &mut self,
-        memory_id: i64,
-        vector: Vec<f32>,
-        meta: VectorMeta,
-    ) -> Result<()> {
+    pub fn insert(&mut self, memory_id: i64, vector: Vec<f32>, meta: VectorMeta) -> Result<()> {
         if vector.len() != self.dim {
             return Err(MemAgentError::Dimension(format!(
                 "Expected {} dims, got {}",

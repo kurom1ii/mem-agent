@@ -34,13 +34,11 @@ pub fn fts5_search_raw(conn: &Connection, query: &str, limit: usize) -> Result<V
         return Ok(Vec::new());
     }
 
-    let sql = format!(
-        "SELECT rowid, bm25(memories_fts, 0.0, 10.0, 5.0) AS score
+    let sql = "SELECT rowid, bm25(memories_fts, 0.0, 10.0, 5.0) AS score
          FROM memories_fts
          WHERE memories_fts MATCH ?1
          ORDER BY score
-         LIMIT ?2"
-    );
+         LIMIT ?2".to_string();
 
     let mut stmt = conn.prepare(&sql)?;
 
@@ -59,17 +57,16 @@ pub fn fts5_search_raw(conn: &Connection, query: &str, limit: usize) -> Result<V
 }
 
 pub fn fts5_rebuild(conn: &Connection) -> Result<()> {
-    conn.execute("INSERT INTO memories_fts(memories_fts) VALUES ('rebuild')", [])?;
+    conn.execute(
+        "INSERT INTO memories_fts(memories_fts) VALUES ('rebuild')",
+        [],
+    )?;
     Ok(())
 }
 
 pub fn fts5_stats(conn: &Connection) -> Result<(usize, usize)> {
     let num_docs: i64 = conn
-        .query_row(
-            "SELECT count(*) FROM memories_fts",
-            [],
-            |row| row.get(0),
-        )
+        .query_row("SELECT count(*) FROM memories_fts", [], |row| row.get(0))
         .unwrap_or(0);
 
     Ok((num_docs as usize, 0))
@@ -88,7 +85,11 @@ mod tests {
 
         conn.execute(
             "INSERT INTO memories (title, content, tags) VALUES (?1, ?2, ?3)",
-            params!["Rust Programming", "Rust is a systems programming language", "rust"],
+            params![
+                "Rust Programming",
+                "Rust is a systems programming language",
+                "rust"
+            ],
         )
         .unwrap();
         conn.execute(
@@ -98,7 +99,11 @@ mod tests {
         .unwrap();
         conn.execute(
             "INSERT INTO memories (title, content, tags) VALUES (?1, ?2, ?3)",
-            params!["Async Rust", "Rust async programming with tokio", "rust,async"],
+            params![
+                "Async Rust",
+                "Rust async programming with tokio",
+                "rust,async"
+            ],
         )
         .unwrap();
 

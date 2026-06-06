@@ -1,9 +1,13 @@
-use clap::{Parser, Subcommand};
 use crate::core::config::DEFAULT_LIMIT;
 use crate::core::error::Result;
+use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "mem-agent", version, about = "High-performance persistent memory engine")]
+#[command(
+    name = "mem-agent",
+    version,
+    about = "High-performance persistent memory engine"
+)]
 pub struct Cli {
     #[arg(short, long, default_value = "memories.db")]
     pub db: String,
@@ -73,19 +77,24 @@ pub fn run(cli: Cli) -> Result<()> {
     let conn = crate::db::schema::get_connection(&cli.db)?;
 
     match cli.command {
-        Command::Add { title, content, tags } => {
+        Command::Add {
+            title,
+            content,
+            tags,
+        } => {
             let id = crate::db::ops::insert_memory(&conn, &title, &content, &tags)?;
             println!("✅ Memory added with ID: {id}");
         }
-        Command::Search { query, mode, tags: _, limit } => {
+        Command::Search {
+            query,
+            mode,
+            tags: _,
+            limit,
+        } => {
             let limit = limit as usize;
             let results = match mode.as_str() {
-                "vector" | "hybrid" => {
-                    crate::db::fts::fts5_search_raw(&conn, &query, limit)?
-                }
-                _ => {
-                    crate::db::fts::fts5_search_raw(&conn, &query, limit)?
-                }
+                "vector" | "hybrid" => crate::db::fts::fts5_search_raw(&conn, &query, limit)?,
+                _ => crate::db::fts::fts5_search_raw(&conn, &query, limit)?,
             };
 
             if results.is_empty() {
@@ -95,7 +104,13 @@ pub fn run(cli: Cli) -> Result<()> {
                 for (i, (id, score)) in results.iter().enumerate() {
                     match crate::db::ops::get_memory(&conn, *id) {
                         Ok(mem) => {
-                            println!("{}. [ID:{}] {} (score: {:.4})", i + 1, mem.id, mem.title, score);
+                            println!(
+                                "{}. [ID:{}] {} (score: {:.4})",
+                                i + 1,
+                                mem.id,
+                                mem.title,
+                                score
+                            );
                             println!("   Tags: {}", mem.tags);
                             println!("   {}\n", &mem.content[..mem.content.len().min(150)]);
                         }
@@ -120,20 +135,23 @@ pub fn run(cli: Cli) -> Result<()> {
                 }
             }
         }
-        Command::Get { id } => {
-            match crate::db::ops::get_memory(&conn, id) {
-                Ok(mem) => {
-                    println!("ID:       {}", mem.id);
-                    println!("Title:    {}", mem.title);
-                    println!("Content:  {}", mem.content);
-                    println!("Tags:     {}", mem.tags);
-                    println!("Created:  {}", mem.created_at);
-                    println!("Updated:  {}", mem.updated_at);
-                }
-                Err(e) => eprintln!("Error: {e}"),
+        Command::Get { id } => match crate::db::ops::get_memory(&conn, id) {
+            Ok(mem) => {
+                println!("ID:       {}", mem.id);
+                println!("Title:    {}", mem.title);
+                println!("Content:  {}", mem.content);
+                println!("Tags:     {}", mem.tags);
+                println!("Created:  {}", mem.created_at);
+                println!("Updated:  {}", mem.updated_at);
             }
-        }
-        Command::Update { id, title, content, tags } => {
+            Err(e) => eprintln!("Error: {e}"),
+        },
+        Command::Update {
+            id,
+            title,
+            content,
+            tags,
+        } => {
             let mem = crate::db::ops::get_memory(&conn, id)?;
             let new_title = title.as_deref().unwrap_or(&mem.title);
             let new_content = content.as_deref().unwrap_or(&mem.content);

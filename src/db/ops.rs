@@ -129,11 +129,15 @@ pub fn load_all_vectors(conn: &Connection) -> Result<Vec<VectorEntry>> {
 
 pub fn get_stats(conn: &Connection) -> Result<DbStats> {
     let memory_count: usize = conn
-        .query_row("SELECT count(*) FROM memories", [], |row| row.get::<_, i64>(0))
+        .query_row("SELECT count(*) FROM memories", [], |row| {
+            row.get::<_, i64>(0)
+        })
         .map(|v| v as usize)?;
 
     let vector_count: usize = conn
-        .query_row("SELECT count(*) FROM vectors", [], |row| row.get::<_, i64>(0))
+        .query_row("SELECT count(*) FROM vectors", [], |row| {
+            row.get::<_, i64>(0)
+        })
         .map(|v| v as usize)?;
 
     Ok(DbStats {

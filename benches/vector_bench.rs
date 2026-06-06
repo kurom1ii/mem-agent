@@ -1,4 +1,4 @@
-use criterion::{black_box, Criterion, criterion_group, criterion_main};
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use mem_agent::core::config::DEFAULT_DIM;
 use mem_agent::core::types::VectorMeta;
 use mem_agent::vector::distance::{cosine, cosine_scalar, cosine_simd};

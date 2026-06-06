@@ -1,5 +1,5 @@
-use std::{fmt, io};
 use rusqlite;
+use std::{fmt, io};
 
 pub type Result<T> = std::result::Result<T, MemAgentError>;
 

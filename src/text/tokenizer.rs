@@ -1,18 +1,15 @@
 use unicode_segmentation::UnicodeSegmentation;
 
 const STOPWORDS: &[&str] = &[
-    "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
-    "have", "has", "had", "do", "does", "did", "will", "would", "could",
-    "should", "may", "might", "can", "shall", "to", "of", "in", "for",
-    "on", "with", "at", "by", "from", "as", "into", "through", "during",
-    "before", "after", "above", "below", "between", "out", "off", "over",
-    "under", "again", "further", "then", "once", "here", "there", "when",
-    "where", "why", "how", "all", "each", "every", "both", "few", "more",
-    "most", "other", "some", "such", "no", "not", "only", "own", "same",
-    "so", "than", "too", "very", "just", "about", "up", "it", "its",
-    "and", "but", "or", "nor", "because", "if", "that", "this", "which",
-    "what", "who", "whom", "whose", "me", "my", "we", "our", "you",
-    "your", "he", "his", "she", "her", "they", "their", "them",
+    "the", "a", "an", "is", "are", "was", "were", "be", "been", "being", "have", "has", "had",
+    "do", "does", "did", "will", "would", "could", "should", "may", "might", "can", "shall", "to",
+    "of", "in", "for", "on", "with", "at", "by", "from", "as", "into", "through", "during",
+    "before", "after", "above", "below", "between", "out", "off", "over", "under", "again",
+    "further", "then", "once", "here", "there", "when", "where", "why", "how", "all", "each",
+    "every", "both", "few", "more", "most", "other", "some", "such", "no", "not", "only", "own",
+    "same", "so", "than", "too", "very", "just", "about", "up", "it", "its", "and", "but", "or",
+    "nor", "because", "if", "that", "this", "which", "what", "who", "whom", "whose", "me", "my",
+    "we", "our", "you", "your", "he", "his", "she", "her", "they", "their", "them",
 ];
 
 pub fn is_stopword(word: &str) -> bool {
@@ -38,9 +35,7 @@ pub fn tokenize_keep_stopwords(text: &str) -> Vec<String> {
         .split_word_bounds()
         .filter(|w| {
             let trimmed = w.trim();
-            !trimmed.is_empty()
-                && trimmed.len() > 1
-                && trimmed.chars().any(|c| c.is_alphabetic())
+            !trimmed.is_empty() && trimmed.len() > 1 && trimmed.chars().any(|c| c.is_alphabetic())
         })
         .map(|w| w.trim().to_string())
         .collect()

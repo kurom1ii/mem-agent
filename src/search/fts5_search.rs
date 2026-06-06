@@ -130,11 +130,31 @@ mod tests {
         init_db(&conn).unwrap();
 
         let entries = [
-            ("Rust Programming", "Rust is a systems programming language with zero cost abstractions", "rust,systems"),
-            ("Python Data Science", "Python is great for data science and machine learning workflows", "python,data"),
-            ("Async Rust", "Rust async programming with tokio runtime for concurrent applications", "rust,async"),
-            ("JavaScript Ecosystem", "JavaScript runs in the browser and on the server with Node.js", "javascript,web"),
-            ("Memory Management", "Understanding memory management in Rust and other systems languages", "rust,memory"),
+            (
+                "Rust Programming",
+                "Rust is a systems programming language with zero cost abstractions",
+                "rust,systems",
+            ),
+            (
+                "Python Data Science",
+                "Python is great for data science and machine learning workflows",
+                "python,data",
+            ),
+            (
+                "Async Rust",
+                "Rust async programming with tokio runtime for concurrent applications",
+                "rust,async",
+            ),
+            (
+                "JavaScript Ecosystem",
+                "JavaScript runs in the browser and on the server with Node.js",
+                "javascript,web",
+            ),
+            (
+                "Memory Management",
+                "Understanding memory management in Rust and other systems languages",
+                "rust,memory",
+            ),
         ];
 
         for (title, content, tags) in entries {
@@ -158,7 +178,9 @@ mod tests {
         let mut searcher = Fts5Searcher::new();
         searcher.build_index(&conn).unwrap();
 
-        let results = searcher.search(&conn, "rust systems programming", 5).unwrap();
+        let results = searcher
+            .search(&conn, "rust systems programming", 5)
+            .unwrap();
         assert!(!results.is_empty());
 
         let titles: Vec<&str> = results.iter().map(|r| r.memory.title.as_str()).collect();

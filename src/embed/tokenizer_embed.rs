@@ -9,8 +9,8 @@ pub struct TokenizerWrapper {
 
 impl TokenizerWrapper {
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, String> {
-        let tokenizer = Tokenizer::from_file(path)
-            .map_err(|e| format!("Failed to load tokenizer: {e}"))?;
+        let tokenizer =
+            Tokenizer::from_file(path).map_err(|e| format!("Failed to load tokenizer: {e}"))?;
         Ok(Self {
             inner: tokenizer,
             max_length: 128,
@@ -59,11 +59,7 @@ impl TokenizerWrapper {
     }
 
     pub fn pad_token_id(&self) -> Option<u32> {
-        self.inner.get_padding().map(|p| {
-            p.pad_id
-                .try_into()
-                .unwrap_or(0)
-        })
+        self.inner.get_padding().map(|p| p.pad_id)
     }
 }
 

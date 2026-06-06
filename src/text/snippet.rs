@@ -17,7 +17,11 @@ pub fn generate_snippet(content: &str, query: &str, window: usize) -> String {
             .collect::<String>()
             .trim()
             .to_string()
-            + if content.chars().count() > window * 2 { "..." } else { "" };
+            + if content.chars().count() > window * 2 {
+                "..."
+            } else {
+                ""
+            };
     }
 
     let content_lower = content.to_lowercase();
@@ -145,9 +149,7 @@ mod tests {
 
     #[test]
     fn test_snippet_default_window() {
-        let content = "x".repeat(50)
-            + " target "
-            + &"y".repeat(50);
+        let content = "x".repeat(50) + " target " + &"y".repeat(50);
         let snippet = generate_snippet(&content, "target", 0);
         assert!(snippet.contains("**target**"));
     }
