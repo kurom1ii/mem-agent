@@ -1,4 +1,20 @@
+use clap::Parser;
+
+mod cli;
+mod core;
+mod db;
+mod embed;
+mod mcp;
+mod persist;
+mod search;
+mod simulation;
+mod text;
+mod vector;
+
 fn main() {
-    println!("mem-agent v0.1.0 - Phase 1: Vector Index");
-    println!("Run 'cargo bench' for benchmarks, 'cargo test' for unit tests.");
+    let cli = cli::Cli::parse();
+    if let Err(e) = cli::run(cli) {
+        eprintln!("Error: {e}");
+        std::process::exit(1);
+    }
 }

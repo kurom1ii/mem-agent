@@ -64,23 +64,15 @@ pub fn fts5_rebuild(conn: &Connection) -> Result<()> {
 }
 
 pub fn fts5_stats(conn: &Connection) -> Result<(usize, usize)> {
-    let count: i64 = conn.query_row(
-        "SELECT doc_count FROM fts5_ns_data WHERE tbl_name = 'memories_fts'",
-        [],
-        |row| row.get(0),
-    )?;
-
-    let num_docs = count as usize;
-
-    let num_terms: i64 = conn
+    let num_docs: i64 = conn
         .query_row(
-            "SELECT count(*) FROM fts5_ns_token WHERE tbl_name = 'memories_fts'",
+            "SELECT count(*) FROM memories_fts",
             [],
             |row| row.get(0),
         )
         .unwrap_or(0);
 
-    Ok((num_docs, num_terms as usize))
+    Ok((num_docs as usize, 0))
 }
 
 #[cfg(test)]

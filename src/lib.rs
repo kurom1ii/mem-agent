@@ -1,7 +1,10 @@
+pub mod cli;
 pub mod core;
 pub mod db;
 pub mod embed;
+pub mod mcp;
 pub mod persist;
 pub mod search;
+pub mod simulation;
 pub mod text;
 pub mod vector;

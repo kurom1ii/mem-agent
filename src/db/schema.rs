@@ -4,8 +4,10 @@ use crate::core::error::Result;
 
 pub fn get_connection(db_path: &str) -> Result<Connection> {
     let conn = Connection::open(db_path)?;
-    conn.execute_batch("PRAGMA journal_mode=WAL;")?;
-    conn.execute_batch("PRAGMA foreign_keys=ON;")?;
+    let _ = conn.pragma_update(None, "foreign_keys", "ON");
+    if db_path != ":memory:" {
+        let _ = conn.pragma_update(None, "journal_mode", "WAL");
+    }
     init_db(&conn)?;
     Ok(conn)
 }
