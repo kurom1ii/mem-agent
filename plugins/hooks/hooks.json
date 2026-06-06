@@ -5,18 +5,28 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo \"[mem-agent] Session started — memory engine ready\""
+            "command": "echo \"[mem-agent] ✅ Memory engine active — $(mem-agent stats 2>/dev/null || echo 'run mem-agent download first')\""
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"\""
           }
         ]
       }
     ],
     "PostToolUse": [
       {
-        "matcher": "Write|Edit|Bash",
+        "matcher": "Write|Edit",
         "hooks": [
           {
             "type": "command",
-            "command": "echo \"[mem-agent] Tool used: ${TOOL_NAME}\""
+            "command": "echo \"[mem-agent] File modified: tracking for context enrichment\""
           }
         ]
       }
@@ -26,7 +36,17 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo \"[mem-agent] Session ended — memories persisted\""
+            "command": "echo \"[mem-agent] 💾 Session ended — memories persisted to SQLite\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"[mem-agent] Shutting down\""
           }
         ]
       }
