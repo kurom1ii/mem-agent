@@ -1,0 +1,10 @@
+/target/
+**/*.rs.bk
+Cargo.lock
+*.db
+models/*.onnx
+models/tokenizer.json
+*.hnsw.bin
+*.bin
+.DS_Store
+.codegraph
