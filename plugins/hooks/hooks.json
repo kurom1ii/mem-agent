@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo \"[mem-agent] ✅ Memory engine active — $(mem-agent stats 2>/dev/null || echo 'run mem-agent download first')\""
+            "command": "node \"${MEMAGENT_PLUGIN_ROOT}/scripts/session-start.mjs\""
           }
         ]
       }
@@ -15,28 +15,88 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo \"\""
+            "command": "node \"${MEMAGENT_PLUGIN_ROOT}/scripts/notification.mjs\""
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|Read|Glob|Grep",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"[mem-agent] Tool: ${OPENCODE_TOOL_NAME}\""
           }
         ]
       }
     ],
     "PostToolUse": [
       {
-        "matcher": "Write|Edit",
         "hooks": [
           {
             "type": "command",
-            "command": "echo \"[mem-agent] File modified: tracking for context enrichment\""
+            "command": "node \"${MEMAGENT_PLUGIN_ROOT}/scripts/post-tool-use.mjs\""
           }
         ]
       }
     ],
-    "SessionEnd": [
+    "PostToolUseFailure": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "echo \"[mem-agent] 💾 Session ended — memories persisted to SQLite\""
+            "command": "echo \"[mem-agent] ❌ Tool failed: ${OPENCODE_TOOL_NAME}\""
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"[mem-agent] Context compacting — memories preserved\""
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"[mem-agent] 🤖 Subagent started\""
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"[mem-agent] 🤖 Subagent finished\""
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${MEMAGENT_PLUGIN_ROOT}/scripts/notification.mjs\""
+          }
+        ]
+      }
+    ],
+    "TaskCompleted": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"[mem-agent] ✅ Task completed\""
           }
         ]
       }
@@ -46,7 +106,17 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo \"[mem-agent] Shutting down\""
+            "command": "node \"${MEMAGENT_PLUGIN_ROOT}/scripts/stop.mjs\""
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${MEMAGENT_PLUGIN_ROOT}/scripts/session-end.mjs\""
           }
         ]
       }

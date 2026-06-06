@@ -1,9 +1,11 @@
 {
   "mcpServers": {
     "mem-agent": {
+      "type": "local",
       "command": "mem-agent",
       "args": ["mcp"],
-      "env": {}
+      "env": {},
+      "tools": ["*"]
     }
   }
 }
