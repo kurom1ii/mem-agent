@@ -3,6 +3,7 @@
 pub mod cli;
 pub mod core;
 pub mod db;
+pub mod download;
 pub mod embed;
 pub mod mcp;
 pub mod persist;

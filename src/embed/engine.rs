@@ -28,6 +28,12 @@ impl EmbeddingEngine {
         })
     }
 
+    pub fn from_pretrained() -> Result<Self, String> {
+        let (model_path, tokenizer_path) = crate::download::ensure_model_downloaded()?;
+        let tokenizer = TokenizerWrapper::from_file(&tokenizer_path)?;
+        Self::new(&model_path, tokenizer)
+    }
+
     fn session(&self) -> Result<EmbeddingSession, String> {
         let model = candle_onnx::read_file(&self.model_path)
             .map_err(|e| format!("Failed to load ONNX model: {e}"))?;

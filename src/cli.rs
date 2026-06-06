@@ -63,6 +63,7 @@ pub enum Command {
         random: bool,
     },
     Stats,
+    Download,
     Mcp,
 }
 
@@ -200,6 +201,12 @@ pub fn run(cli: Cli) -> Result<()> {
             println!("Vector count:  {}", stats.vector_count);
             println!("FTS docs:      {docs}");
             println!("FTS terms:     {terms}");
+        }
+        Command::Download => {
+            let (model_path, tokenizer_path) = crate::download::ensure_model_downloaded()
+                .map_err(crate::core::error::MemAgentError::Config)?;
+            println!("Model: {model_path}");
+            println!("Tokenizer: {tokenizer_path}");
         }
         Command::Mcp => {
             println!("Starting mem-agent MCP server...");
