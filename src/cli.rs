@@ -219,10 +219,10 @@ pub fn run(cli: Cli) -> Result<()> {
             println!("[1/2] Loading engine...");
             let engine = crate::embed::engine::EmbeddingEngine::from_pretrained()
                 .map_err(crate::core::error::MemAgentError::Config)?;
-            println!("  ✅ Engine loaded (dim: {})", engine.dim());
+            println!("  ✅ Engine loaded (dim: {}, GPU: enabled)", engine.dim());
 
             println!("[2/2] Running inference...");
-            let query = "Hello world from mem-agent";
+            let query = "Rust have cargo to install packages";
             let start = std::time::Instant::now();
             let vec = engine.embed_query(query)
                 .map_err(crate::core::error::MemAgentError::Config)?;

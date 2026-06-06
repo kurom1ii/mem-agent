@@ -11,6 +11,7 @@ pub struct EmbeddingEngine {
     model_path: String,
     tokenizer: TokenizerWrapper,
     dim: usize,
+    use_gpu: bool,
 }
 
 impl EmbeddingEngine {
@@ -19,11 +20,17 @@ impl EmbeddingEngine {
             model_path: model_path.to_string(),
             tokenizer,
             dim: 768,
+            use_gpu: true,
         }
     }
 
+    pub fn cpu_only(mut self) -> Self {
+        self.use_gpu = false;
+        self
+    }
+
     pub fn init(mut self) -> Result<Self, String> {
-        self.dim = Self::probe_dim(&self.model_path)?;
+        self.dim = Self::probe_dim(&self.model_path, self.use_gpu)?;
         Ok(self)
     }
 
@@ -37,13 +44,27 @@ impl EmbeddingEngine {
         self.dim
     }
 
-    fn probe_dim(model_path: &str) -> Result<usize, String> {
-        let mut session = Session::builder()
+    pub fn is_gpu(&self) -> bool {
+        self.use_gpu
+    }
+
+    fn probe_dim(model_path: &str, use_gpu: bool) -> Result<usize, String> {
+        let mut builder = Session::builder()
             .map_err(|e| format!("Builder: {e}"))?
             .with_optimization_level(GraphOptimizationLevel::Level3)
-            .map_err(|e| format!("Opt: {e}"))?
-            .with_intra_threads(1)
-            .map_err(|e| format!("Threads: {e}"))?
+            .map_err(|e| format!("Opt: {e}"))?;
+
+        if use_gpu {
+            builder = builder
+                .with_execution_providers([ort::ep::CUDA::default().build()])
+                .map_err(|e| format!("CUDA EP: {e}"))?;
+        } else {
+            builder = builder
+                .with_intra_threads(4)
+                .map_err(|e| format!("Threads: {e}"))?;
+        }
+
+        let mut session = builder
             .commit_from_file(model_path)
             .map_err(|e| format!("Load: {e}"))?;
 
@@ -76,12 +97,22 @@ impl EmbeddingEngine {
     }
 
     fn session(&self) -> Result<Session, String> {
-        Session::builder()
+        let mut builder = Session::builder()
             .map_err(|e| format!("Builder: {e}"))?
             .with_optimization_level(GraphOptimizationLevel::Level3)
-            .map_err(|e| format!("Opt: {e}"))?
-            .with_intra_threads(4)
-            .map_err(|e| format!("Threads: {e}"))?
+            .map_err(|e| format!("Opt: {e}"))?;
+
+        if self.use_gpu {
+            builder = builder
+                .with_execution_providers([ort::ep::CUDA::default().build()])
+                .map_err(|e| format!("CUDA EP: {e}"))?;
+        } else {
+            builder = builder
+                .with_intra_threads(4)
+                .map_err(|e| format!("Threads: {e}"))?;
+        }
+
+        builder
             .commit_from_file(&self.model_path)
             .map_err(|e| format!("Load: {e}"))
     }
