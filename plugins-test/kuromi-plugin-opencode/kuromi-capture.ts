@@ -1,19 +1,19 @@
 import type { Plugin } from "@opencode-ai/plugin";
 import * as fs from "fs";
 import * as path from "path";
-import * as os from "os";
 
 // =====================================================================
 // kuromi-plugin-opencode — Hook Demo Plugin
 // =====================================================================
 // Plugin minh họa: hook TOÀN BỘ các hook có thể trong OpenCode.
-// Mỗi hook ghi 1 dòng log vào file ~/.opencode-kuromi-hooks.log
+// Mỗi hook ghi 1 dòng log vào file .kuromi-hooks.log
+// trong WORKING DIRECTORY của project hiện tại.
 //
 // KHÔNG làm gì khác ngoài in log. Dùng để kiểm tra hook nào
 // thực sự được kích hoạt trong từng tình huống.
 // =====================================================================
 
-const LOG_FILE = path.join(os.homedir(), ".opencode-kuromi-hooks.log");
+const LOG_FILE = path.join(process.cwd(), ".kuromi-hooks.log");
 const MAX_LOG_SIZE = 5 * 1024 * 1024; // 5MB
 const SEPARATOR = "─".repeat(80);
 

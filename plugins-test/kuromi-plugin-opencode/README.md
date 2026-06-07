@@ -11,14 +11,11 @@ cp -r plugins-test/kuromi-plugin-opencode ~/.config/opencode/plugins/kuromi-plug
 ## Xem log
 
 ```bash
-# Real-time
-tail -f ~/.opencode-kuromi-hooks.log
-
-# Mở bằng editor
-code ~/.opencode-kuromi-hooks.log
+# Real-time (trong thư mục project)
+tail -f .kuromi-hooks.log
 
 # Xóa log cũ
-rm ~/.opencode-kuromi-hooks.log
+rm .kuromi-hooks.log
 ```
 
 ## Format log
