@@ -1,4 +1,9 @@
+use crate::core::types::SearchResult;
+use crate::embed::engine::EmbeddingEngine;
+use crate::embed::tokenizer_embed::TokenizerWrapper;
 use crate::mcp::protocol::{CallToolParams, JsonRpcResponse, ToolDefinition};
+use crate::search::fts5_search::Fts5Searcher;
+use crate::search::hybrid::HybridSearch;
 
 pub fn list_tools_definitions() -> Vec<ToolDefinition> {
     vec![
@@ -158,49 +163,54 @@ fn handle_memory_search(
 
     match mode {
         "fts5" => {
-            let results = crate::db::fts::fts5_search_raw(conn, query, limit)
+            let results = build_fts5_searcher(conn)?
+                .search(conn, query, limit)
                 .map_err(|e| format!("FTS5 search error: {e}"))?;
-            let mut output = String::new();
-            for (id, score) in &results {
-                match crate::db::ops::get_memory(conn, *id) {
-                    Ok(mem) => {
-                        output.push_str(&format!(
-                            "[ID:{}] {} (score: {:.4})\n  {}\n\n",
-                            mem.id,
-                            mem.title,
-                            score,
-                            &mem.content[..mem.content.len().min(200)],
-                        ));
-                    }
-                    Err(_) => {
-                        output.push_str(&format!("[ID:{}] (score: {:.4})\n\n", id, score));
-                    }
+            Ok(format_search_results("fts5", &results))
+        }
+        "vector" => {
+            let hybrid = build_hybrid_search(conn)?;
+            if hybrid.vector_store.is_empty() {
+                return Ok(
+                    "No vectors indexed yet. Save memories after model setup or use mode=\"fts5\"."
+                        .to_string(),
+                );
+            }
+            let results = hybrid
+                .search_vector_only(conn, query, limit)
+                .map_err(|e| format!("Vector search error: {e}"))?;
+            Ok(format_search_results("vector", &results))
+        }
+        "hybrid" => match build_hybrid_search(conn) {
+            Ok(hybrid) => {
+                if hybrid.vector_store.is_empty() {
+                    let results = build_fts5_searcher(conn)?
+                        .search(conn, query, limit)
+                        .map_err(|e| format!("FTS5 fallback error: {e}"))?;
+                    Ok(format!(
+                        "Hybrid fallback: no vectors indexed yet.\n\n{}",
+                        format_search_results("fts5", &results)
+                    ))
+                } else {
+                    let results = hybrid
+                        .search(conn, query, limit)
+                        .map_err(|e| format!("Hybrid search error: {e}"))?;
+                    Ok(format_search_results("hybrid", &results))
                 }
             }
-            Ok(output.trim().to_string())
-        }
-        _ => {
-            let results = crate::db::fts::fts5_search_raw(conn, query, limit)
-                .map_err(|e| format!("Search error: {e}"))?;
-            let mut output = String::new();
-            for (id, score) in &results {
-                match crate::db::ops::get_memory(conn, *id) {
-                    Ok(mem) => {
-                        output.push_str(&format!(
-                            "[ID:{}] {} (score: {:.4})\n  {}\n\n",
-                            mem.id,
-                            mem.title,
-                            score,
-                            &mem.content[..mem.content.len().min(200)],
-                        ));
-                    }
-                    Err(_) => {
-                        output.push_str(&format!("[ID:{}] (score: {:.4})\n\n", id, score));
-                    }
-                }
+            Err(err) => {
+                let results = build_fts5_searcher(conn)?
+                    .search(conn, query, limit)
+                    .map_err(|e| format!("FTS5 fallback error: {e}"))?;
+                Ok(format!(
+                    "Hybrid fallback: {err}\n\n{}",
+                    format_search_results("fts5", &results)
+                ))
             }
-            Ok(output.trim().to_string())
-        }
+        },
+        other => Err(format!(
+            "Unsupported mode '{other}'. Use one of: fts5, vector, hybrid."
+        )),
     }
 }
 
@@ -220,7 +230,17 @@ fn handle_memory_add(
 
     let id = crate::db::ops::insert_memory(conn, title, content, tags)
         .map_err(|e| format!("Insert error: {e}"))?;
-    Ok(format!("Memory added with ID: {id}"))
+
+    let combined = format!("title: {title}\ncontent: {content}");
+    let vector_status = match embed_memory_document(&combined) {
+        Ok(vector) => match crate::db::ops::insert_vector(conn, id, &vector) {
+            Ok(()) => "vector indexed".to_string(),
+            Err(e) => format!("memory stored, vector insert failed: {e}"),
+        },
+        Err(e) => format!("memory stored, vector skipped: {e}"),
+    };
+
+    Ok(format!("Memory added with ID: {id} ({vector_status})"))
 }
 
 fn handle_memory_get(
@@ -283,4 +303,78 @@ fn handle_index_stats(conn: &rusqlite::Connection) -> Result<String, String> {
         "vector_count": stats.vector_count,
     }))
     .unwrap_or_else(|_| format!("{stats:?}")))
+}
+
+fn build_fts5_searcher(conn: &rusqlite::Connection) -> Result<Fts5Searcher, String> {
+    let mut searcher = Fts5Searcher::new();
+    searcher
+        .build_index(conn)
+        .map_err(|e| format!("BM25 index build error: {e}"))?;
+    Ok(searcher)
+}
+
+fn build_hybrid_search(conn: &rusqlite::Connection) -> Result<HybridSearch, String> {
+    let embed = load_embedding_engine()?;
+    let mut hybrid = HybridSearch::new(embed);
+    hybrid
+        .build_indices(conn)
+        .map_err(|e| format!("Index build error: {e}"))?;
+    Ok(hybrid)
+}
+
+fn load_embedding_engine() -> Result<EmbeddingEngine, String> {
+    let (model_path, tokenizer_path) =
+        crate::download::ensure_model_downloaded().map_err(|e| format!("Model download: {e}"))?;
+    let tokenizer =
+        TokenizerWrapper::from_file(&tokenizer_path).map_err(|e| format!("Tokenizer load: {e}"))?;
+
+    EmbeddingEngine::new(&model_path, tokenizer.clone())
+        .init()
+        .or_else(|gpu_err| {
+            EmbeddingEngine::new(&model_path, tokenizer)
+                .cpu_only()
+                .init()
+                .map_err(|cpu_err| {
+                    format!("GPU init failed: {gpu_err}; CPU fallback failed: {cpu_err}")
+                })
+        })
+}
+
+fn embed_memory_document(text: &str) -> Result<Vec<f32>, String> {
+    load_embedding_engine()?
+        .embed_document(text)
+        .map_err(|e| format!("Embedding failed: {e}"))
+}
+
+fn format_search_results(mode: &str, results: &[SearchResult]) -> String {
+    if results.is_empty() {
+        return format!("No results found in {mode} mode.");
+    }
+
+    let mut output = String::new();
+    output.push_str(&format!(
+        "Search mode: {mode}\nResults: {}\n\n",
+        results.len()
+    ));
+
+    for result in results {
+        let preview = if result.snippet.trim().is_empty() {
+            result.memory.content.chars().take(200).collect::<String>()
+        } else {
+            result.snippet.clone()
+        };
+
+        output.push_str(&format!(
+            "[ID:{}] {} | score={:.4} | fts={:.4} | vector={:.4}\n  tags={}\n  {}\n\n",
+            result.memory.id,
+            result.memory.title,
+            result.score,
+            result.fts_score,
+            result.vector_score,
+            result.memory.tags,
+            preview,
+        ));
+    }
+
+    output.trim().to_string()
 }

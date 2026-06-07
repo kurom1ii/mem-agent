@@ -212,9 +212,8 @@ pub fn run(cli: Cli) -> Result<()> {
         Command::Verify => {
             println!("=== mem-agent ONNX Model Verification (ort) ===\n");
 
-            let (_model_path, _tokenizer_path) =
-                crate::download::ensure_model_downloaded()
-                    .map_err(crate::core::error::MemAgentError::Config)?;
+            let (_model_path, _tokenizer_path) = crate::download::ensure_model_downloaded()
+                .map_err(crate::core::error::MemAgentError::Config)?;
 
             println!("[1/2] Loading engine...");
             let engine = crate::embed::engine::EmbeddingEngine::from_pretrained()
@@ -224,7 +223,8 @@ pub fn run(cli: Cli) -> Result<()> {
             println!("[2/2] Running inference...");
             let query = "Rust have cargo to install packages";
             let start = std::time::Instant::now();
-            let vec = engine.embed_query(query)
+            let vec = engine
+                .embed_query(query)
                 .map_err(crate::core::error::MemAgentError::Config)?;
             let elapsed = start.elapsed();
 
@@ -233,13 +233,14 @@ pub fn run(cli: Cli) -> Result<()> {
             println!("  Query:        {query}");
             println!("  Embedding dim: {}", vec.len());
             println!("  First 5:      {:?}", &vec[..5]);
-            println!("  Last 5:       {:?}", &vec[vec.len()-5..]);
+            println!("  Last 5:       {:?}", &vec[vec.len() - 5..]);
             let norm: f32 = vec.iter().map(|x| x * x).sum::<f32>().sqrt();
             println!("  L2 norm:      {:.6}", norm);
 
             let doc = "Rust is a systems programming language";
             let start = std::time::Instant::now();
-            let vec2 = engine.embed_document(doc)
+            let vec2 = engine
+                .embed_document(doc)
                 .map_err(crate::core::error::MemAgentError::Config)?;
             let elapsed2 = start.elapsed();
 
@@ -253,7 +254,6 @@ pub fn run(cli: Cli) -> Result<()> {
             println!("\n  ✅ Model hoạt động bình thường!");
         }
         Command::Mcp => {
-            println!("Starting mem-agent MCP server...");
             let server = crate::mcp::server::McpServer::new(&cli.db)?;
             server.run_stdio();
         }

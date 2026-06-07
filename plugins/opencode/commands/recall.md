@@ -6,4 +6,4 @@ Tìm kiếm memory từ mem-agent.
 
 **MCP Tool:** `memory_search` (mem-agent)
 
-Searches past memories using hybrid BM25 + vector semantic search. Returns ranked results.
+Searches past memories from the local mem-agent MCP server. Prefer `mode="hybrid"`; backend falls back to FTS5 if vectors are unavailable.

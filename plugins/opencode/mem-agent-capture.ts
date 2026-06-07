@@ -1,53 +1,169 @@
 import type { Plugin } from "@opencode-ai/plugin";
+import { spawn } from "node:child_process";
+import { appendFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
+import path from "node:path";
 
-// =====================================================================
-// mem-agent OpenCode Plugin — Kiến trúc Hook Engine
-// =====================================================================
-//
-// OpenCode Plugin cung cấp 2 LOẠI hook chính:
-//
-// ┌─────────────────────────────────────────────────────────────┐
-// │ 1. EVENT HANDLER — `event({ event })`                      │
-// │    Bắt TẤT CẢ các sự kiện session lifecycle.               │
-// │    event.type quyết định hook nào được kích hoạt.          │
-// │                                                             │
-// │ 2. CHAT HOOKS — các hàm riêng biệt:                        │
-// │    • "chat.message"  → khi user gửi tin nhắn               │
-// │    • "chat.params"   → khi model/tham số thay đổi          │
-// │    • "tool.execute.before" → TRƯỚC KHI tool chạy           │
-// │    • "experimental.chat.system.transform" → sửa system prompt│
-// │    • "config"        → khi config được load                │
-// └─────────────────────────────────────────────────────────────┘
-//
-// === LUỒNG HOẠT ĐỘNG ĐIỂN HÌNH ===
-//
-// 1. OpenCode khởi động → config() hook chạy
-// 2. User mở session mới → event "session.created"
-// 3. system.transform hook chạy → ta nhồi MEMAGENT_INSTRUCTIONS
-//    vào system prompt. Từ lúc này AI BIẾT có mem-agent tools.
-// 4. User chat → "chat.message" hook chạy → ta track file
-// 5. AI gọi tool (vd: Write, Edit) → "tool.execute.before" chạy
-//    → ta track file paths để sau này enrich context
-// 6. Tool chạy xong → event "message.part.updated" type="tool"
-//    → ta log kết quả, track thêm files
-// 7. User đóng session → event "session.deleted"
-//    → ta dọn dẹp state
-// =====================================================================
-
-// ─── Các hằng số cấu hình ───
 const FILE_TOOLS = new Set(["Read", "Write", "Edit", "Glob", "Grep", "Bash"]);
 const FILE_KEYS = ["filePath", "file_path", "path", "file", "pattern"];
 const MAX_STASHED_FILES = 30;
+const MAX_MEMORY_CONTENT = 4000;
+const RECENT_MEMORY_LIMIT = 8;
+const RECALL_LIMIT = 5;
 const DEBUG = process.env.MEMAGENT_DEBUG === "1";
+const AUTO_SAVE = process.env.MEMAGENT_AUTO_SAVE !== "0";
+const AUTO_RECALL = process.env.MEMAGENT_AUTO_RECALL !== "0";
+const LOG_PATH = "/home/kuromi/work/mywork/mem-agent/plugins/opencode/log.log";
+const SEP = "─".repeat(92);
+const LABEL_WIDTH = 22;
+
+type PromptCapture = {
+  text: string;
+  files: string[];
+  agent: string;
+  model: string;
+  variant: string;
+  parts: string[];
+};
+
+type RunResult = {
+  ok: boolean;
+  stdout: string;
+  stderr: string;
+  code: number | null;
+};
+
+const ANSI = {
+  reset: "\x1b[0m",
+  dim: "\x1b[2m",
+  bold: "\x1b[1m",
+  gray: "\x1b[90m",
+  red: "\x1b[91m",
+  green: "\x1b[92m",
+  yellow: "\x1b[93m",
+  blue: "\x1b[94m",
+  magenta: "\x1b[95m",
+  cyan: "\x1b[96m",
+  white: "\x1b[97m",
+} as const;
+
+const LABEL_COLORS: Record<string, string> = {
+  PLUGIN_LOADED: ANSI.bold + ANSI.white,
+  SESSION_CREATED: ANSI.bold + ANSI.green,
+  SESSION_DELETED: ANSI.bold + ANSI.red,
+  USER_CAPTURE: ANSI.blue,
+  ASSIST_CAPTURE: ANSI.green,
+  TOOL_CAPTURE: ANSI.cyan,
+  PATCH_CAPTURE: ANSI.yellow,
+  STEP_CAPTURE: ANSI.magenta,
+  FILE_TRACK: ANSI.blue,
+  AUTO_SAVE_OK: ANSI.green,
+  AUTO_SAVE_ERR: ANSI.red,
+  AUTO_RECALL_OK: ANSI.cyan,
+  AUTO_RECALL_EMPTY: ANSI.gray,
+  AUTO_RECALL_ERR: ANSI.red,
+  RECENT_LOAD: ANSI.white,
+  SYSTEM_INJECT: ANSI.magenta,
+  TOOL_BEFORE: ANSI.yellow,
+  DEBUG: ANSI.gray,
+  SECTION: ANSI.dim + ANSI.gray,
+} as const;
+
+const LABEL_DESCRIPTIONS: Record<string, string> = {
+  PLUGIN_LOADED: "plugin boot",
+  SESSION_CREATED: "new session",
+  SESSION_DELETED: "session closed",
+  USER_CAPTURE: "user prompt saved",
+  ASSIST_CAPTURE: "assistant meta saved",
+  TOOL_CAPTURE: "tool result saved",
+  PATCH_CAPTURE: "patch saved",
+  STEP_CAPTURE: "step saved",
+  FILE_TRACK: "tracked file",
+  AUTO_SAVE_OK: "memory write ok",
+  AUTO_SAVE_ERR: "memory write fail",
+  AUTO_RECALL_OK: "memory recall hit",
+  AUTO_RECALL_EMPTY: "memory recall miss",
+  AUTO_RECALL_ERR: "memory recall fail",
+  RECENT_LOAD: "recent memories",
+  SYSTEM_INJECT: "system context inject",
+  TOOL_BEFORE: "pre-tool stash",
+  DEBUG: "debug",
+  SECTION: "session marker",
+} as const;
 
 function log(...args: unknown[]): void {
   if (DEBUG) console.log("[mem-agent]", ...args);
-}
-function errlog(...args: unknown[]): void {
-  if (DEBUG) console.error("[mem-agent]", ...args);
+  logLine("DEBUG", { text: args.map((arg) => safeSlice(arg, 180)).join(" | ") });
 }
 
-// ─── Helpers ───
+function errlog(...args: unknown[]): void {
+  if (DEBUG) console.error("[mem-agent]", ...args);
+  logLine("AUTO_SAVE_ERR", { text: args.map((arg) => safeSlice(arg, 180)).join(" | ") });
+}
+
+function safeSlice(v: unknown, max: number): string {
+  if (typeof v === "string") return v.slice(0, max);
+  if (v == null) return "";
+  try {
+    return JSON.stringify(v).slice(0, max);
+  } catch {
+    return "";
+  }
+}
+
+function oneLine(v: unknown, max: number): string {
+  return safeSlice(v, max).replace(/\s+/g, " ").trim();
+}
+
+function nowStamp(): string {
+  const d = new Date();
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  const ss = String(d.getSeconds()).padStart(2, "0");
+  const ms = String(d.getMilliseconds()).padStart(3, "0");
+  return `${hh}:${mm}:${ss}.${ms}`;
+}
+
+function padLabel(label: string): string {
+  return label.padEnd(LABEL_WIDTH, " ");
+}
+
+function fmtFields(fields: Record<string, unknown>): string {
+  return Object.entries(fields)
+    .filter(([, value]) => value !== "" && value != null)
+    .map(([key, value]) => `${ANSI.dim}${key}${ANSI.reset}=${oneLine(value, 220)}`)
+    .join(` ${ANSI.gray}|${ANSI.reset} `);
+}
+
+function rawWrite(line: string): void {
+  appendFileSync(LOG_PATH, `${line}\n`);
+}
+
+function logLine(label: string, fields: Record<string, unknown> = {}): void {
+  const color = LABEL_COLORS[label] || ANSI.white;
+  const desc = LABEL_DESCRIPTIONS[label];
+  const descText = desc ? ` ${ANSI.dim}(${desc})${ANSI.reset}` : "";
+  const head = `${ANSI.gray}[${nowStamp()}]${ANSI.reset} ${color}${padLabel(label)}${ANSI.reset}${descText}`;
+  const body = fmtFields(fields);
+  rawWrite(body ? `${head} ${ANSI.gray}>>${ANSI.reset} ${body}` : head);
+}
+
+function logSection(title: string, sessionId: string): void {
+  rawWrite(`${LABEL_COLORS.SECTION}${SEP}${ANSI.reset}`);
+  logLine("SECTION", { title, session: sessionId || "-" });
+  rawWrite(`${LABEL_COLORS.SECTION}${SEP}${ANSI.reset}`);
+}
+
+function normalizeTag(tag: string): string {
+  return tag
+    .toLowerCase()
+    .replace(/[^a-z0-9._/-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function joinTags(tags: string[]): string {
+  return [...new Set(tags.map(normalizeTag).filter(Boolean))].join(",");
+}
+
 function extractFilePaths(args: Record<string, unknown>): string[] {
   const files: string[] = [];
   for (const key of FILE_KEYS) {
@@ -56,40 +172,220 @@ function extractFilePaths(args: Record<string, unknown>): string[] {
   }
   return files;
 }
-function safeSlice(v: unknown, max: number): string {
-  if (typeof v === "string") return v.slice(0, max);
-  if (v == null) return "";
-  try { return JSON.stringify(v).slice(0, max); } catch { return ""; }
+
+function summarizeModel(model: unknown): string {
+  if (typeof model === "string") return model;
+  if (!model || typeof model !== "object") return "";
+  const m = model as Record<string, unknown>;
+  const provider = typeof m.providerID === "string" ? m.providerID : "";
+  const id = typeof m.id === "string" ? m.id : "";
+  return [provider, id].filter(Boolean).join("/");
 }
 
-// =====================================================================
-// MEMAGENT_INSTRUCTIONS — Nhồi vào system prompt qua system.transform
-// =====================================================================
-//
-// Đây là CỐT LÕI của plugin. Khi được inject vào system prompt,
-// AI sẽ biết:
-//   - Có những MCP tool nào (memory_search, memory_add, ...)
-//   - Cách dùng từng tool (args, khi nào nên gọi)
-//   - Best practices (gọi memory_list đầu session, memory_search
-//     trước khi edit file, memory_add sau quyết định quan trọng)
-//
-// ⚠️ KHÁC BIỆT VỚI AGENTMEMORY:
-//   Agentmemory inject CONTEXT ĐỘNG (gọi API /session/start để
-//   lấy memories liên quan). Chúng ta inject STATIC INSTRUCTIONS.
-//   Để có context động, cần sửa system.transform để gọi MCP tool
-//   memory_list và nhồi kết quả vào đây.
-// =====================================================================
+function extractTextParts(parts: unknown[]): string {
+  return parts
+    .filter((part) => part && typeof part === "object")
+    .map((part) => part as Record<string, unknown>)
+    .filter((part) => part.type === "text" && !part.synthetic && !part.ignored)
+    .map((part) => (typeof part.text === "string" ? part.text : ""))
+    .filter(Boolean)
+    .join("\n")
+    .trim();
+}
+
+function extractFileParts(parts: unknown[]): string[] {
+  return parts
+    .filter((part) => part && typeof part === "object")
+    .map((part) => part as Record<string, unknown>)
+    .filter((part) => part.type === "file")
+    .map((part) => {
+      if (typeof part.filename === "string") return part.filename;
+      if (typeof part.url === "string") return part.url;
+      return "";
+    })
+    .filter(Boolean);
+}
+
+function summarizeParts(parts: unknown[]): string[] {
+  return parts
+    .filter((part) => part && typeof part === "object")
+    .map((part) => {
+      const p = part as Record<string, unknown>;
+      return typeof p.type === "string" ? p.type : "";
+    })
+    .filter(Boolean);
+}
+
+function makeTitle(prefix: string, text: string): string {
+  const preview = oneLine(text, 64) || "event";
+  return oneLine(`${prefix}: ${preview}`, 80);
+}
+
+function resolveMemAgentBin(): string {
+  const envBin = process.env.MEMAGENT_BIN?.trim();
+  if (envBin) return envBin;
+
+  const releaseBin = path.resolve(process.cwd(), "target", "release", "mem-agent");
+  if (existsSync(releaseBin)) return releaseBin;
+
+  const debugBin = path.resolve(process.cwd(), "target", "debug", "mem-agent");
+  if (existsSync(debugBin)) return debugBin;
+
+  return "mem-agent";
+}
+
+function resolveDbPath(): string {
+  return process.env.MEMAGENT_DB?.trim() || path.resolve(process.cwd(), "memories.db");
+}
+
+async function runMemAgent(args: string[], timeoutMs = 8000): Promise<RunResult> {
+  return new Promise((resolve) => {
+    const child = spawn(resolveMemAgentBin(), ["--db", resolveDbPath(), ...args], {
+      env: process.env,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    let stdout = "";
+    let stderr = "";
+    let settled = false;
+
+    const finish = (result: RunResult) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(result);
+    };
+
+    const timer = setTimeout(() => {
+      child.kill("SIGKILL");
+      finish({
+        ok: false,
+        stdout,
+        stderr: stderr || `Timed out after ${timeoutMs}ms`,
+        code: null,
+      });
+    }, timeoutMs);
+
+    child.stdout.on("data", (data) => {
+      stdout += data.toString();
+    });
+    child.stderr.on("data", (data) => {
+      stderr += data.toString();
+    });
+    child.on("error", (error) => {
+      finish({
+        ok: false,
+        stdout,
+        stderr: error.message,
+        code: null,
+      });
+    });
+    child.on("close", (code) => {
+      finish({
+        ok: code === 0,
+        stdout: stdout.trim(),
+        stderr: stderr.trim(),
+        code,
+      });
+    });
+  });
+}
+
+async function addMemory(title: string, content: string, tags: string[]): Promise<void> {
+  if (!AUTO_SAVE) return;
+
+  const cleanTitle = oneLine(title, 80);
+  const cleanContent = safeSlice(content, MAX_MEMORY_CONTENT).trim();
+  if (!cleanTitle || !cleanContent) return;
+
+  const result = await runMemAgent(
+    ["add", cleanTitle, cleanContent, "--tags", joinTags(tags)],
+    12000,
+  );
+
+  if (!result.ok) {
+    logLine("AUTO_SAVE_ERR", {
+      title: cleanTitle,
+      stderr: result.stderr || result.stdout,
+      code: result.code ?? "",
+    });
+    errlog("auto-save failed", cleanTitle, result.stderr || result.stdout);
+    return;
+  }
+
+  logLine("AUTO_SAVE_OK", {
+    title: cleanTitle,
+    tags: joinTags(tags),
+    result: result.stdout,
+  });
+}
+
+async function searchMemories(query: string, limit = RECALL_LIMIT): Promise<string> {
+  const cleanQuery = safeSlice(query, 500).trim();
+  if (!AUTO_RECALL || !cleanQuery) return "";
+
+  const result = await runMemAgent(
+    ["search", cleanQuery, "--mode", "fts5", "-n", String(limit)],
+    8000,
+  );
+
+  if (!result.ok) {
+    logLine("AUTO_RECALL_ERR", {
+      query: cleanQuery,
+      stderr: result.stderr || result.stdout,
+      code: result.code ?? "",
+    });
+    errlog("auto-recall failed", cleanQuery, result.stderr || result.stdout);
+    return "";
+  }
+
+  if (!result.stdout || result.stdout.includes("No results found")) {
+    logLine("AUTO_RECALL_EMPTY", {
+      query: cleanQuery,
+      limit,
+    });
+    return "";
+  }
+
+  logLine("AUTO_RECALL_OK", {
+    query: cleanQuery,
+    limit,
+    result: result.stdout,
+  });
+  return result.stdout;
+}
+
+async function listRecentMemories(limit = RECENT_MEMORY_LIMIT): Promise<string> {
+  const result = await runMemAgent(["list", "-n", String(limit)], 8000);
+  if (!result.ok || !result.stdout || result.stdout.includes("No memories stored")) {
+    logLine("RECENT_LOAD", {
+      limit,
+      status: "empty",
+      stderr: result.stderr,
+    });
+    return "";
+  }
+  logLine("RECENT_LOAD", {
+    limit,
+    status: "loaded",
+    result: result.stdout,
+  });
+  return result.stdout;
+}
+
 const MEMAGENT_INSTRUCTIONS = `<mem-agent-instructions>
 Bạn có quyền truy cập mem-agent — bộ nhớ dài hạn cho AI agent.
 Hãy CHỦ ĐỘNG dùng các MCP tool dưới đây.
 
 CÔNG CỤ CÓ SẴN (dùng đúng tên với prefix "mem-agent_"):
 
-mem-agent_memory_search — Tìm kiếm hybrid (BM25 + vector).
+mem-agent_memory_search — Tìm kiếm memory đã lưu.
   Args: query (string, bắt buộc), limit (int, mặc định 10),
         mode ("fts5"|"vector"|"hybrid")
   → Dùng khi: user hỏi "nhớ gì về...", cần context trước khi sửa file,
     muốn biết lịch sử project.
+  → Mặc định nên dùng mode="hybrid". Nếu model/vector chưa sẵn,
+    backend sẽ fallback về FTS5.
 
 mem-agent_memory_add — Lưu memory mới.
   Args: title (string), content (string), tags (string, optional)
@@ -113,248 +409,265 @@ mem-agent_index_stats — Thống kê bộ nhớ.
 
 QUY TẮC:
 1. Đầu session → gọi memory_list để xem context gần đây.
-2. Trước khi edit file → gọi memory_search với tên file.
+2. Trước khi edit file → gọi memory_search với tên file, ưu tiên mode="hybrid".
 3. Sau quyết định quan trọng → gọi memory_add.
 4. Khi user hỏi về quá khứ → LUÔN gọi memory_search trước khi trả lời.
 </mem-agent-instructions>`;
 
-// =====================================================================
-// SESSION STATE — theo dõi trạng thái phiên làm việc
-// =====================================================================
 let activeSessionId: string | null = null;
 let projectPath: string | null = null;
-const trackedFiles = new Map<string, Set<string>>();   // session → files
-const seenToolCallIds = new Map<string, Set<string>>(); // tránh duplicate
-const contextInjected = new Set<string>();              // session đã inject
+const trackedFiles = new Map<string, Set<string>>();
+const seenToolCallIds = new Map<string, Set<string>>();
+const contextInjected = new Set<string>();
+const pendingPrompts = new Map<string, PromptCapture>();
+const turnPrompts = new Map<string, string>();
 
 function fileSet(sid: string): Set<string> {
   let s = trackedFiles.get(sid);
-  if (!s) { s = new Set<string>(); trackedFiles.set(sid, s); }
+  if (!s) {
+    s = new Set<string>();
+    trackedFiles.set(sid, s);
+  }
   return s;
 }
+
 function toolCallSet(sid: string): Set<string> {
   let s = seenToolCallIds.get(sid);
-  if (!s) { s = new Set<string>(); seenToolCallIds.set(sid, s); }
+  if (!s) {
+    s = new Set<string>();
+    seenToolCallIds.set(sid, s);
+  }
   return s;
 }
-function pruneMaps(): void {
-  if (trackedFiles.size > 100) {
-    const oldest = [...trackedFiles.keys()].slice(0, 30);
-    for (const k of oldest) trackedFiles.delete(k);
-  }
-  if (contextInjected.size > 50) {
-    const oldest = [...contextInjected].slice(0, 10);
-    for (const k of oldest) contextInjected.delete(k);
-  }
+
+function cleanupSession(sid: string): void {
+  trackedFiles.delete(sid);
+  seenToolCallIds.delete(sid);
+  contextInjected.delete(sid);
+  pendingPrompts.delete(sid);
+  turnPrompts.delete(sid);
 }
 
-// =====================================================================
-// PLUGIN ENTRY POINT
-// =====================================================================
-// Plugin factory — OpenCode gọi hàm này khi load plugin.
-// `ctx` chứa thông tin project (worktree, project.id).
-// Trả về object với các hook handler.
 export const MemAgentPlugin: Plugin = async (ctx) => {
   projectPath = ctx.worktree || ctx.project?.id || process.cwd();
-  log(`Plugin loaded — project: ${projectPath}`);
+  mkdirSync(path.dirname(LOG_PATH), { recursive: true });
+  writeFileSync(LOG_PATH, "");
+  logLine("PLUGIN_LOADED", {
+    project: projectPath,
+    pid: process?.pid,
+    log: LOG_PATH,
+    autoSave: AUTO_SAVE,
+    autoRecall: AUTO_RECALL,
+    db: resolveDbPath(),
+    bin: resolveMemAgentBin(),
+  });
+  log("plugin loaded", projectPath);
 
   return {
-    // ==================================================================
-    // EVENT HANDLER — Universal event dispatcher
-    // ==================================================================
-    // TẤT CẢ sự kiện session lifecycle đều vào đây.
-    // Phân biệt bằng `event.type`. Mỗi loại có `properties` riêng.
-    // Đây là hook QUAN TRỌNG NHẤT — nó bắt mọi thứ xảy ra.
     event: async ({ event }) => {
       const type = event.type;
       const props = (event as any).properties || {};
 
-      // ─── SESSION LIFECYCLE ───────────────────────────────
-
-      // session.created — KHI TẠO PHIÊN MỚI
-      // Chạy 1 lần duy nhất lúc bắt đầu session.
-      // → props.info: { id, title, parentID, version }
-      // → Ta khởi tạo trackedFiles, reset state cho session mới.
       if (type === "session.created") {
         const info = props.info as Record<string, unknown> | undefined;
         activeSessionId = (info?.id as string) || props.sessionID || null;
-        if (activeSessionId) {
-          trackedFiles.set(activeSessionId, new Set());
-          seenToolCallIds.delete(activeSessionId);
-          contextInjected.delete(activeSessionId);
-        }
-        log(`Session created: ${activeSessionId}`);
+        if (!activeSessionId) return;
+        logSection("SESSION START", activeSessionId);
+        logLine("SESSION_CREATED", {
+          id: activeSessionId,
+          title: safeSlice(info?.title, 100),
+        });
+        fileSet(activeSessionId);
+        seenToolCallIds.delete(activeSessionId);
+        contextInjected.delete(activeSessionId);
+        pendingPrompts.delete(activeSessionId);
+        turnPrompts.delete(activeSessionId);
+        return;
       }
 
-      // session.status — KHI TRẠNG THÁI PHIÊN THAY ĐỔI
-      // → props.status: { type: "idle" | "active" | ... }
-      // → Khi idle, agentmemory chạy summarize. Ta chỉ log.
-      if (type === "session.status") {
-        const status = props.status as Record<string, unknown> | undefined;
-        const sid = props.sessionID || activeSessionId;
-        if (sid && status) {
-          log(`Session status → ${status.type} (${sid.slice(0, 8)}...)`);
-        }
-      }
-
-      // session.compacted — KHI CONTEXT BỊ NÉN
-      // OpenCode tự động nén context khi quá dài.
-      // → Memories đã lưu trong SQLite không bị ảnh hưởng.
-      if (type === "session.compacted") {
-        const sid = props.sessionID || activeSessionId;
-        log(`Context compacted → session ${sid?.slice(0, 8)}`);
-      }
-
-      // session.updated — KHI METADATA PHIÊN THAY ĐỔI
-      // → props.info: { title, parentID, summary }
-      if (type === "session.updated") {
-        const info = props.info as Record<string, unknown> | undefined;
-        const sid = (info?.id as string) || props.sessionID || activeSessionId;
-        if (sid) log(`Session updated: ${sid.slice(0, 8)}`);
-      }
-
-      // session.diff — KHI CÓ DIFF GIỮA CÁC LẦN CHAT
-      // → props.diff: [{ file, additions, deletions }]
-      // → Ta track files đã thay đổi để enrich context sau.
-      if (type === "session.diff") {
-        const sid = props.sessionID || activeSessionId;
-        if (sid && Array.isArray(props.diff)) {
-          const diffs = props.diff as Array<Record<string, unknown>>;
-          for (const d of diffs) {
-            if (typeof d.file === "string") fileSet(sid).add(d.file);
-          }
-        }
-      }
-
-      // session.deleted — KHI PHIÊN KẾT THÚC
-      // → Dọn dẹp toàn bộ state của session.
-      // → Agentmemory chạy summarize + consolidate ở đây.
       if (type === "session.deleted") {
         const sid = props.info?.id || props.sessionID || activeSessionId;
-        if (sid) {
-          log(`Session ended → cleaning up ${sid}`);
-          trackedFiles.delete(sid);
-          seenToolCallIds.delete(sid);
-          contextInjected.delete(sid);
-          if (sid === activeSessionId) activeSessionId = null;
-          pruneMaps();
-        }
+        if (!sid) return;
+        logLine("SESSION_DELETED", { id: sid });
+        logSection("SESSION END", sid);
+        cleanupSession(sid);
+        if (sid === activeSessionId) activeSessionId = null;
+        return;
       }
 
-      // session.error — KHI PHIÊN GẶP LỖI
-      if (type === "session.error") {
-        const sid = props.sessionID || activeSessionId;
-        if (sid) errlog(`Session error: ${safeSlice(props.error, 500)}`);
-      }
-
-      // ─── MESSAGE EVENTS ──────────────────────────────────
-
-      // message.updated — KHI TIN NHẮN ĐƯỢC CẬP NHẬT
-      // → props.info.role: "user" | "assistant"
-      // → Agentmemory dùng để capture cả user prompt và AI response.
-      // → Ta chỉ log để debug.
       if (type === "message.updated") {
         const info = props.info as Record<string, unknown> | undefined;
-        if (info?.role === "assistant") {
-          log(`Assistant reply → id=${(info.id as string)?.slice(0, 8)}`);
+        const sid = props.sessionID || (info?.sessionID as string) || activeSessionId;
+        if (!info || !sid) return;
+
+        if (info.role === "user") {
+          const capture = pendingPrompts.get(sid);
+          const prompt = capture?.text || turnPrompts.get(sid) || "";
+          if (!prompt) return;
+
+          turnPrompts.set(sid, prompt);
+          await addMemory(
+            makeTitle("user", prompt),
+            [
+              `kind=prompt_submit`,
+              `session=${sid}`,
+              `project=${projectPath || ""}`,
+              `agent=${capture?.agent || ""}`,
+              `model=${capture?.model || ""}`,
+              `variant=${capture?.variant || ""}`,
+              `files=${(capture?.files || []).join(", ")}`,
+              `parts=${(capture?.parts || []).join(", ")}`,
+              "",
+              prompt,
+            ].join("\n"),
+            ["auto", "prompt", "user", "chat"],
+          );
+          logLine("USER_CAPTURE", {
+            session: sid,
+            prompt,
+            files: (capture?.files || []).join(", "),
+            model: capture?.model || "",
+          });
+          return;
+        }
+
+        if (info.role === "assistant") {
+          turnPrompts.delete(sid);
+          pendingPrompts.delete(sid);
+          await addMemory(
+            makeTitle("assistant", `${info.modelID || "reply"} ${info.finish || ""}`),
+            [
+              `kind=assistant_message`,
+              `session=${sid}`,
+              `project=${projectPath || ""}`,
+              `model=${info.modelID || ""}`,
+              `provider=${info.providerID || ""}`,
+              `finish=${info.finish || ""}`,
+              `error=${safeSlice(info.error, 300)}`,
+            ].join("\n"),
+            ["auto", "assistant", "reply", "meta"],
+          );
+          logLine("ASSIST_CAPTURE", {
+            session: sid,
+            model: info.modelID || "",
+            provider: info.providerID || "",
+            finish: info.finish || "",
+            error: safeSlice(info.error, 200),
+          });
+          return;
         }
       }
 
-      // message.removed — KHI TIN NHẮN BỊ XÓA KHỎI CONTEXT
-      if (type === "message.removed") {
-        log(`Message removed: ${props.messageID}`);
-      }
-
-      // message.part.updated — KHI 1 PHẦN CỦA TIN NHẮN THAY ĐỔI
-      // Đây là hook CHI TIẾT NHẤT. Mỗi message có nhiều "parts":
-      //
-      //   part.type = "tool"       → AI gọi tool (Write, Bash, Grep...)
-      //     part.state.status: "running" → "completed" | "error"
-      //     → Ta capture input/output của tool, track files
-      //
-      //   part.type = "subtask"    → AI spawn subagent
-      //   part.type = "step-finish"→ AI kết thúc 1 bước reasoning
-      //   part.type = "reasoning"  → AI đang suy nghĩ (thinking)
-      //   part.type = "file"       → AI tạo/reference file
-      //   part.type = "patch"      → AI đề xuất thay đổi code
-      //   part.type = "compaction" → Context bị nén
-      //   part.type = "agent"      → AI chọn agent khác
-      //   part.type = "retry"      → AI thử lại
-      //
       if (type === "message.part.updated") {
         const part = props.part as Record<string, unknown> | undefined;
         if (!part) return;
         const sid = (part.sessionID as string) || props.sessionID || activeSessionId;
         if (!sid) return;
 
-        // ── SUBTASK: AI spawn subagent ──
-        if (part.type === "subtask") {
-          log(`🤖 Subagent started: ${part.id} (agent=${part.agent})`);
-          return;
-        }
-
-        // ── TOOL: AI gọi tool (Write, Edit, Bash, Grep...) ──
         if (part.type === "tool") {
           const state = part.state as Record<string, unknown> | undefined;
           if (!state) return;
+
           const callId = part.callID as string;
           if (!callId) return;
-          const toolName = part.tool as string;
 
-          // Tool completed — capture input/output
-          if (state.status === "completed") {
-            const callSet = toolCallSet(sid);
-            if (callSet.has(callId)) return; // tránh duplicate
-            callSet.add(callId);
-            log(`✅ Tool done: ${toolName} (${callId.slice(0, 8)})`);
+          const seen = toolCallSet(sid);
+          if (seen.has(callId)) return;
 
-            // Track file paths từ tool arguments
-            if (FILE_TOOLS.has(toolName) && state.input) {
-              const args = state.input as Record<string, unknown>;
-              for (const fp of extractFilePaths(args)) {
-                fileSet(sid).add(fp);
+          if (state.status === "completed" || state.status === "error") {
+            seen.add(callId);
+
+            if (state.input && typeof state.input === "object") {
+              for (const file of extractFilePaths(state.input as Record<string, unknown>)) {
+                fileSet(sid).add(file);
               }
             }
-          }
 
-          // Tool failed — log lỗi
-          if (state.status === "error") {
-            const callSet = toolCallSet(sid);
-            if (callSet.has(callId)) return;
-            callSet.add(callId);
-            errlog(`❌ Tool failed: ${toolName} → ${safeSlice(state.error, 200)}`);
+            await addMemory(
+              makeTitle(
+                `tool-${state.status}`,
+                `${part.tool || "tool"} ${state.title || callId}`,
+              ),
+              [
+                `kind=${state.status === "completed" ? "post_tool_use" : "post_tool_failure"}`,
+                `session=${sid}`,
+                `project=${projectPath || ""}`,
+                `tool=${part.tool || ""}`,
+                `call_id=${callId}`,
+                `title=${safeSlice(state.title, 160)}`,
+                `input=${safeSlice(state.input, 2000)}`,
+                `output=${safeSlice(state.output ?? state.error, 2000)}`,
+              ].join("\n"),
+              [
+                "auto",
+                "tool",
+                typeof part.tool === "string" ? part.tool : "tool",
+                state.status === "completed" ? "success" : "error",
+              ],
+            );
+            logLine("TOOL_CAPTURE", {
+              session: sid,
+              tool: part.tool || "",
+              status: state.status,
+              call: callId,
+              title: safeSlice(state.title, 120),
+            });
           }
           return;
         }
 
-        // ── STEP-FINISH: AI kết thúc 1 bước ──
-        if (part.type === "step-finish") {
-          log(`Step finished → reason: ${part.reason}`);
+        if (part.type === "patch") {
+          const files = Array.isArray((part as any).files) ? (part as any).files : [];
+          for (const file of files) {
+            if (typeof file === "string") fileSet(sid).add(file);
+          }
+          await addMemory(
+            makeTitle("patch", files.join(", ") || "patch"),
+            [
+              `kind=patch_applied`,
+              `session=${sid}`,
+              `project=${projectPath || ""}`,
+              `hash=${safeSlice((part as any).hash, 80)}`,
+              `files=${files.join(", ")}`,
+            ].join("\n"),
+            ["auto", "patch", "code"],
+          );
+          logLine("PATCH_CAPTURE", {
+            session: sid,
+            files: files.join(", "),
+          });
+          return;
         }
 
-        // ── REASONING: AI đang suy nghĩ ──
-        if (part.type === "reasoning") {
-          log(`Thinking... ${safeSlice((part as any).text, 100)}`);
-        }
-
-        // ── FILE: file được tạo/tham chiếu ──
         if (part.type === "file") {
           const filename = (part as any).filename || (part as any).url;
-          if (filename) fileSet(sid).add(filename);
+          if (typeof filename === "string" && filename.length > 0) {
+            fileSet(sid).add(filename);
+          }
+          return;
         }
 
-        // ── PATCH: thay đổi code ──
-        if (part.type === "patch") {
-          const pf = (part as any).files || [];
-          for (const f of pf) fileSet(sid).add(f);
+        if (part.type === "step-finish") {
+          await addMemory(
+            makeTitle("step", safeSlice(part.reason, 80)),
+            [
+              `kind=step_finish`,
+              `session=${sid}`,
+              `project=${projectPath || ""}`,
+              `reason=${safeSlice(part.reason, 120)}`,
+              `cost=${safeSlice((part as any).cost, 80)}`,
+              `tokens=${safeSlice((part as any).tokens, 200)}`,
+            ].join("\n"),
+            ["auto", "step", "reasoning"],
+          );
+          logLine("STEP_CAPTURE", {
+            session: sid,
+            reason: safeSlice(part.reason, 120),
+          });
+          return;
         }
       }
 
-      // ─── FILE EVENTS ─────────────────────────────────────
-
-      // file.edited — KHI FILE ĐƯỢC CHỈNH SỬA (ngoài tool Write/Edit)
-      // → props.file: đường dẫn file
-      // → Ta thêm vào tracked set để sau enrich context
       if (type === "file.edited") {
         const sid = props.sessionID || activeSessionId;
         if (sid && typeof props.file === "string") {
@@ -363,149 +676,144 @@ export const MemAgentPlugin: Plugin = async (ctx) => {
           if (stash.size > MAX_STASHED_FILES) {
             const keep = [...stash].slice(-MAX_STASHED_FILES);
             stash.clear();
-            for (const f of keep) stash.add(f);
+            for (const file of keep) stash.add(file);
           }
-          log(`File edited: ${props.file} (${stash.size} files tracked)`);
+          logLine("FILE_TRACK", {
+            session: sid,
+            file: props.file,
+            tracked: stash.size,
+          });
         }
-      }
-
-      // ─── PERMISSION EVENTS ───────────────────────────────
-
-      // permission.updated — KHI OPEnCODE HỎI QUYỀN
-      // → props.type: loại permission (tool, file, command...)
-      // → props.pattern: pattern cần quyền
-      if (type === "permission.updated") {
-        const sid = props.sessionID || activeSessionId;
-        if (sid) log(`Permission asked: ${props.type} → ${props.pattern}`);
-      }
-
-      // permission.replied — KHI USER TRẢ LỜI CHO PHÉP/TỪ CHỐI
-      if (type === "permission.replied") {
-        log(`Permission reply: ${props.response || props.reply}`);
-      }
-
-      // ─── TASK EVENTS ─────────────────────────────────────
-
-      // todo.updated — KHI TODO LIST THAY ĐỔI
-      // → props.todos: [{ content, status, priority }]
-      // → Agentmemory capture để biết task nào đã hoàn thành
-      if (type === "todo.updated") {
-        const todos = Array.isArray(props.todos) ? props.todos : [];
-        const completed = todos.filter((t: any) => t.status === "completed");
-        const active = todos.filter((t: any) => t.status !== "completed");
-        if (completed.length > 0) {
-          log(`Tasks: ${completed.length} done, ${active.length} remaining`);
-        }
-      }
-
-      // ─── COMMAND EVENTS ──────────────────────────────────
-
-      // command.executed — KHI USER CHẠY SLASH COMMAND
-      // → props.name: tên command (/remember, /recall...)
-      // → props.arguments: tham số
-      if (type === "command.executed") {
-        log(`Command: /${props.name}`);
       }
     },
 
-    // ==================================================================
-    // CHAT MESSAGE HOOK
-    // ==================================================================
-    // Chạy khi user gửi tin nhắn HOẶC AI trả lời.
-    // input: { sessionID, agent, model, variant }
-    // output: { parts: [...] } — các phần của tin nhắn
-    // → Agentmemory dùng để capture user prompt + AI response.
-    // → Ta chỉ log để debug, không capture nội dung chat.
-    "chat.message": async (input, _output) => {
+    "chat.message": async (input, output) => {
       const sid = input.sessionID || activeSessionId;
-      if (sid) log(`💬 Chat → session ${sid.slice(0, 8)}`);
-    },
+      if (!sid) return;
 
-    // ==================================================================
-    // CHAT PARAMS HOOK
-    // ==================================================================
-    // Chạy khi tham số chat thay đổi (model, temperature, ...)
-    // → Agentmemory capture để biết model nào đang dùng.
-    "chat.params": async (input, _output) => {
-      if (input.model) {
-        log(`Model: ${input.model.providerID}/${input.model.id}`);
+      const parts = Array.isArray((output as any)?.parts) ? (output as any).parts : [];
+      const text = extractTextParts(parts);
+      const files = extractFileParts(parts);
+
+      const stash = fileSet(sid);
+      for (const file of files) stash.add(file);
+      if (stash.size > MAX_STASHED_FILES) {
+        const keep = [...stash].slice(-MAX_STASHED_FILES);
+        stash.clear();
+        for (const file of keep) stash.add(file);
       }
+
+      if (!text) return;
+
+      const capture: PromptCapture = {
+        text,
+        files,
+        agent: safeSlice(input.agent, 60),
+        model: summarizeModel(input.model),
+        variant: safeSlice(input.variant, 60),
+        parts: summarizeParts(parts),
+      };
+
+      pendingPrompts.set(sid, capture);
+      turnPrompts.set(sid, text);
+      logLine("USER_CAPTURE", {
+        session: sid,
+        stage: "chat.message",
+        text,
+        files: files.join(", "),
+        agent: capture.agent,
+        model: capture.model,
+      });
     },
 
-    // ==================================================================
-    // SYSTEM TRANSFORM HOOK — QUAN TRỌNG NHẤT
-    // ==================================================================
-    // Chạy TRƯỚC KHI system prompt được gửi cho AI.
-    // → output.system: mảng string, ta có thể push thêm context.
-    //
-    // ĐÂY LÀ NƠI TA INJECT MEMAGENT INSTRUCTIONS:
-    // 1. Kiểm tra session đã được inject chưa (tránh duplicate)
-    // 2. Push MEMAGENT_INSTRUCTIONS → AI biết có memory tools
-    // 3. Push tracked files context → AI biết files nào đang active
-    // 4. Đánh dấu session đã inject
-    //
-    // ⚠️ CẢI TIẾN TƯƠNG LAI:
-    // Có thể gọi MCP tool memory_list ở đây, lấy kết quả,
-    // và inject vào system prompt để AI thấy context THỰC TẾ.
-    // Hiện tại chỉ inject STATIC instructions.
+    "chat.params": async (_input, _output) => {},
+
     "experimental.chat.system.transform": async (input, output) => {
       const sid = input.sessionID || activeSessionId;
       if (!sid || !Array.isArray(output.system)) return;
 
-      // Chỉ inject 1 lần mỗi session
       if (!contextInjected.has(sid)) {
-        // (1) Nhồi instructions — AI biết tool nào có sẵn
         output.system.push(MEMAGENT_INSTRUCTIONS);
 
-        // (2) Nhồi context về files đang được track
-        const stash = fileSet(sid);
-        if (stash.size > 0) {
-          const files = [...stash].slice(0, 10);
-          output.system.push(
-            `\n<mem-agent-context>\n` +
-            `Files đang active: ${files.join(", ")}\n` +
-            `Dùng mem-agent_memory_search để kiểm tra context cũ\n` +
-            `của các file này TRƯỚC KHI chỉnh sửa.\n` +
-            `</mem-agent-context>\n`
-          );
+        const recent = await listRecentMemories();
+        if (recent) {
+          output.system.push(`<mem-agent-recent>\n${recent}\n</mem-agent-recent>`);
         }
 
         contextInjected.add(sid);
-        pruneMaps();
-        log(`Context injected → session ${sid.slice(0, 8)} (${stash.size} files)`);
+        logLine("SYSTEM_INJECT", {
+          session: sid,
+          stage: "initial",
+          recent: recent ? "yes" : "no",
+        });
+      }
+
+      const prompt = turnPrompts.get(sid)?.trim();
+      if (prompt) {
+        const recalled = await searchMemories(prompt, RECALL_LIMIT);
+        if (recalled) {
+          output.system.push(
+            `<mem-agent-recall>\nQuery: ${safeSlice(prompt, 240)}\n${recalled}\n</mem-agent-recall>`,
+          );
+        }
+        logLine("SYSTEM_INJECT", {
+          session: sid,
+          stage: "prompt-recall",
+          query: prompt,
+          recalled: recalled ? "yes" : "no",
+        });
+      }
+
+      const stash = fileSet(sid);
+      if (stash.size > 0) {
+        const files = [...stash].slice(0, 5);
+        const sections: string[] = [];
+
+        for (const file of files) {
+          const recalled = await searchMemories(file, 3);
+          if (recalled) {
+            sections.push(`File: ${file}\n${recalled}`);
+          }
+          stash.delete(file);
+        }
+
+        if (sections.length > 0) {
+          output.system.push(
+            `<mem-agent-file-context>\n${sections.join("\n\n")}\n</mem-agent-file-context>`,
+          );
+        }
+        logLine("SYSTEM_INJECT", {
+          session: sid,
+          stage: "file-recall",
+          files: files.join(", "),
+          recalled: sections.length,
+        });
       }
     },
 
-    // ==================================================================
-    // TOOL EXECUTE BEFORE HOOK
-    // ==================================================================
-    // Chạy TRƯỚC KHI AI thực thi 1 tool.
-    // → Chỉ hook cho FILE_TOOLS (Write, Edit, Read, Grep, ...)
-    // → Ta extract file paths từ args để track.
-    // → Mục đích: biết AI đang làm việc với file nào để
-    //   sau này enrich context với memory liên quan.
     "tool.execute.before": async (input, output) => {
       if (!FILE_TOOLS.has(input.tool)) return;
       const sid = input.sessionID || activeSessionId;
       if (!sid) return;
+
       const args = output.args as Record<string, unknown> | undefined;
       if (!args) return;
+
       const stash = fileSet(sid);
-      for (const fp of extractFilePaths(args)) stash.add(fp);
+      for (const file of extractFilePaths(args)) stash.add(file);
       if (stash.size > MAX_STASHED_FILES) {
         const keep = [...stash].slice(-MAX_STASHED_FILES);
         stash.clear();
-        for (const f of keep) stash.add(f);
+        for (const file of keep) stash.add(file);
       }
+      logLine("TOOL_BEFORE", {
+        session: sid,
+        tool: input.tool,
+        files: extractFilePaths(args).join(", "),
+        tracked: stash.size,
+      });
     },
 
-    // ==================================================================
-    // CONFIG HOOK
-    // ==================================================================
-    // Chạy 1 lần khi OpenCode load config (model, theme, agents, ...)
-    // → Agentmemory capture để biết user dùng model gì, theme gì.
-    config: async (input) => {
-      log(`Config: model=${input.model?.id}, agent=${input.agent?.id}`);
-    },
+    config: async (_input) => {},
   };
 };

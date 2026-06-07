@@ -2,21 +2,15 @@
 // mem-agent post-tool-use hook
 // Called after each tool execution to track context.
 
-const fs = require("fs");
-const path = require("path");
+import { spawnMemAgent, waitForExit } from "./_memagent.mjs";
 
 async function main() {
   const toolName = process.env.OPENCODE_TOOL_NAME || "";
-  const sessionId = process.env.OPENCODE_SESSION_ID || "";
 
   if (!["Write", "Edit", "Bash"].includes(toolName)) return;
 
-  const memAgentBin = process.env.MEMAGENT_BIN || "mem-agent";
-  const dbPath = process.env.MEMAGENT_DB || "memories.db";
-
   try {
-    const { spawn } = require("child_process");
-    const result = spawn(memAgentBin, ["--db", dbPath, "stats"], {
+    const result = spawnMemAgent(["stats"], {
       stdio: ["ignore", "pipe", "pipe"],
       timeout: 3000,
     });
@@ -24,7 +18,7 @@ async function main() {
     let output = "";
     result.stdout.on("data", (data) => { output += data.toString(); });
 
-    await new Promise((resolve) => result.on("close", resolve));
+    await waitForExit(result);
 
     const match = output.match(/Memory count:\s+(\d+)/);
     const count = match ? parseInt(match[1]) : 0;

@@ -3,17 +3,14 @@
 // Called when OpenCode ends a session.
 // Triggers memory stats summary.
 
-const { spawn } = require("child_process");
+import { spawnMemAgent, waitForExit } from "./_memagent.mjs";
 
 async function main() {
   const sessionId = process.env.OPENCODE_SESSION_ID || "unknown";
   console.log(`[mem-agent] Session ended: ${sessionId}`);
 
-  const memAgentBin = process.env.MEMAGENT_BIN || "mem-agent";
-  const dbPath = process.env.MEMAGENT_DB || "memories.db";
-
   try {
-    const result = spawn(memAgentBin, ["--db", dbPath, "stats"], {
+    const result = spawnMemAgent(["stats"], {
       stdio: ["ignore", "pipe", "pipe"],
       timeout: 5000,
     });
@@ -21,7 +18,7 @@ async function main() {
     let output = "";
     result.stdout.on("data", (data) => { output += data.toString(); });
 
-    await new Promise((resolve) => result.on("close", resolve));
+    await waitForExit(result);
 
     if (output.trim()) {
       console.log(`[mem-agent] Final stats:\n${output.trim()}`);

@@ -3,7 +3,7 @@
     "mem-agent": {
       "type": "local",
       "command": "mem-agent",
-      "args": ["mcp"],
+      "args": ["--db", "memories.db", "mcp"],
       "env": {},
       "tools": ["*"]
     }

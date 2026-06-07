@@ -32,7 +32,7 @@ impl HybridSearch {
     ) -> Result<Vec<SearchResult>> {
         let query_vector = self
             .embed
-            .embed(query)
+            .embed_query(query)
             .map_err(MemAgentError::Embed)?;
 
         let fts_results = self.fts5.search(conn, query, limit * 3)?;
@@ -84,7 +84,7 @@ impl HybridSearch {
     ) -> Result<Vec<SearchResult>> {
         let query_vector = self
             .embed
-            .embed(query)
+            .embed_query(query)
             .map_err(MemAgentError::Embed)?;
 
         let vec_hits = exact_knn_single(
@@ -205,8 +205,7 @@ mod tests {
         let ids: Vec<i64> = (1..=5).collect();
         insert_test_vectors(&conn, &ids);
 
-        let engine =
-            EmbeddingEngine::new("", crate::embed::tokenizer_embed::make_test_tokenizer());
+        let engine = EmbeddingEngine::new("", crate::embed::tokenizer_embed::make_test_tokenizer());
         let mut hybrid = HybridSearch::new(engine);
         hybrid.load_vectors(&conn).unwrap();
 
@@ -216,8 +215,7 @@ mod tests {
     #[test]
     fn test_search_fts5_only() {
         let conn = setup_db();
-        let engine =
-            EmbeddingEngine::new("", crate::embed::tokenizer_embed::make_test_tokenizer());
+        let engine = EmbeddingEngine::new("", crate::embed::tokenizer_embed::make_test_tokenizer());
         let mut hybrid = HybridSearch::new(engine);
         hybrid.fts5.build_index(&conn).unwrap();
 
@@ -263,8 +261,7 @@ mod tests {
         let ids: Vec<i64> = (1..=5).collect();
         insert_test_vectors(&conn, &ids);
 
-        let engine =
-            EmbeddingEngine::new("", crate::embed::tokenizer_embed::make_test_tokenizer());
+        let engine = EmbeddingEngine::new("", crate::embed::tokenizer_embed::make_test_tokenizer());
         let mut hybrid = HybridSearch::new(engine);
         hybrid.load_vectors(&conn).unwrap();
 
@@ -301,8 +298,7 @@ mod tests {
         let ids: Vec<i64> = (1..=5).collect();
         insert_test_vectors(&conn, &ids);
 
-        let engine =
-            EmbeddingEngine::new("", crate::embed::tokenizer_embed::make_test_tokenizer());
+        let engine = EmbeddingEngine::new("", crate::embed::tokenizer_embed::make_test_tokenizer());
         let mut hybrid = HybridSearch::new(engine);
         hybrid.build_indices(&conn).unwrap();
 
@@ -316,8 +312,7 @@ mod tests {
         let ids: Vec<i64> = (1..=5).collect();
         insert_test_vectors(&conn, &ids);
 
-        let engine =
-            EmbeddingEngine::new("", crate::embed::tokenizer_embed::make_test_tokenizer());
+        let engine = EmbeddingEngine::new("", crate::embed::tokenizer_embed::make_test_tokenizer());
         let mut hybrid = HybridSearch::new(engine);
         hybrid.build_indices(&conn).unwrap();
 

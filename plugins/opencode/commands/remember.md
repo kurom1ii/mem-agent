@@ -6,4 +6,4 @@ Lưu kiến thức vào mem-agent.
 
 **MCP Tool:** `memory_add` (mem-agent)
 
-Saves the provided insight, decision, or fact to persistent memory with auto-extracted tags.
+Saves the provided insight, decision, or fact to persistent memory. Infer a short title and tags before calling the tool.

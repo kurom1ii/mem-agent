@@ -1,7 +1,7 @@
 {
   "name": "mem-agent",
   "version": "0.1.0",
-  "description": "OpenCode plugin for mem-agent — Rust persistent memory engine with hybrid search (BM25 + SIMD + ONNX). Auto-injects memory instructions, tracks file edits, enriches context with past knowledge.",
+  "description": "OpenCode plugin for mem-agent — auto-captures chat/tool activity, auto-recalls memory into system prompts, and exposes slash commands via the local Rust MCP server.",
   "author": {
     "name": "kurom1ii",
     "url": "https://github.com/kurom1ii"

@@ -1,0 +1,122 @@
+[90m[20:29:48.691][0m [1m[97mPLUGIN_LOADED           [0m [2m(plugin boot)[0m [90m>>[0m [2mproject[0m=/ [90m|[0m [2mpid[0m=55890 [90m|[0m [2mlog[0m=/home/kuromi/work/mywork/mem-agent/plugins-test/kuromi-plugin-opencode/log.log
+[90m[20:29:48.691][0m [97mCONFIG                  [0m [2m(config loaded)[0m
+[2m[90m────────────────────────────────────────────────────────────────────────────────────────────[0m
+[90m[20:29:50.920][0m [2m[90mSECTION                 [0m [2m(session marker)[0m [90m>>[0m [2mtitle[0m=SESSION START [90m|[0m [2msession[0m=ses_15db97bbcffeuP7V
+[2m[90m────────────────────────────────────────────────────────────────────────────────────────────[0m
+[90m[20:29:50.920][0m [1m[92mSESSION_CREATED         [0m [2m(new session)[0m [90m>>[0m [2mid[0m=ses_15db97bbcffeuP7V [90m|[0m [2mtitle[0m=New session - 2026-06-07T13:29:50.915Z [90m|[0m [2mcount[0m=1
+[90m[20:29:50.927][0m [94mCHAT_MESSAGE            [0m [2m(chat payload)[0m [90m>>[0m [2magent[0m=build [90m|[0m [2mmodel[0m={"providerID":"openc [90m|[0m [2mparts[0m=1 [90m|[0m [2minputText[0m=ses_15db97bbcffeuP7VkISnd9s75u [90m|[0m [2moutputText[0m=msg_ea246844d001lmjJWOXWqUwa6M
+[90m[20:29:50.929][0m [92mMSG_UPDATED             [0m [2m(message changed)[0m [90m>>[0m [2mrole[0m=user [90m|[0m [2mtext[0m=ses_15db97bbcffeuP7VkISnd9s75u
+[90m[20:29:50.934][0m [94mSESSION_UPDATED         [0m [2m(metadata changed)[0m [90m>>[0m [2mtitle[0m=New session - 2026-06-07T13:29:50.915Z
+[90m[20:29:50.936][0m [96mSESSION_STATUS          [0m [2m(session state)[0m [90m>>[0m [2mtype[0m=busy
+[90m[20:29:50.939][0m [92mMSG_UPDATED             [0m [2m(message changed)[0m [90m>>[0m [2mrole[0m=assistant [90m|[0m [2mmodel[0m=deepseek-v4-flash [90m|[0m [2mprovider[0m=opencode-go [90m|[0m [2mtext[0m=ses_15db97bbcffeuP7VkISnd9s75u
+[90m[20:29:50.967][0m [95mSYSTEM_TRANSFORM        [0m [2m(inject system prompt)[0m [90m>>[0m [2mblocks[0m=1
+[90m[20:29:50.967][0m [96mCHAT_PARAMS             [0m [2m(chat params)[0m [90m>>[0m [2magent[0m=title [90m|[0m [2mmodel[0m=deepseek-v4-flash
+[90m[20:29:52.056][0m [96mSESSION_STATUS          [0m [2m(session state)[0m [90m>>[0m [2mtype[0m=busy
+[90m[20:29:52.057][0m [95mSYSTEM_TRANSFORM        [0m [2m(inject system prompt)[0m [90m>>[0m [2mblocks[0m=1
+[90m[20:29:52.057][0m [96mCHAT_PARAMS             [0m [2m(chat params)[0m [90m>>[0m [2magent[0m=build [90m|[0m [2mmodel[0m=deepseek-v4-flash
+[90m[20:29:52.062][0m [94mSESSION_UPDATED         [0m [2m(metadata changed)[0m [90m>>[0m [2mtitle[0m=New session - 2026-06-07T13:29:50.915Z
+[90m[20:29:52.062][0m [93mSESSION_DIFF            [0m [2m(chat diff)[0m [90m>>[0m [2mcount[0m=0
+[90m[20:29:52.064][0m [92mMSG_UPDATED             [0m [2m(message changed)[0m [90m>>[0m [2mrole[0m=user [90m|[0m [2mtext[0m=ses_15db97bbcffeuP7VkISnd9s75u
+[90m[20:29:54.976][0m [95mPART_REASONING          [0m [2m(model thinking)[0m
+[90m[20:29:55.200][0m [95mPART_REASONING          [0m [2m(model thinking)[0m [90m>>[0m [2mtext[0m=Chào người dùng bằng tiếng Việt.
+[90m[20:29:55.433][0m [93mPART_STEP_FINISH        [0m [2m(reasoning step done)[0m [90m>>[0m [2mreason[0m=stop
+[90m[20:29:55.434][0m [92mMSG_UPDATED             [0m [2m(message changed)[0m [90m>>[0m [2mrole[0m=assistant [90m|[0m [2mmodel[0m=deepseek-v4-flash [90m|[0m [2mprovider[0m=opencode-go [90m|[0m [2mfinish[0m=stop [90m|[0m [2mtext[0m=ses_15db97bbcffeuP7VkISnd9s75u
+[90m[20:29:55.436][0m [92mMSG_UPDATED             [0m [2m(message changed)[0m [90m>>[0m [2mrole[0m=assistant [90m|[0m [2mmodel[0m=deepseek-v4-flash [90m|[0m [2mprovider[0m=opencode-go [90m|[0m [2mfinish[0m=stop [90m|[0m [2mtext[0m=ses_15db97bbcffeuP7VkISnd9s75u
+[90m[20:29:55.436][0m [96mSESSION_STATUS          [0m [2m(session state)[0m [90m>>[0m [2mtype[0m=busy
+[90m[20:29:55.437][0m [96mSESSION_STATUS          [0m [2m(session state)[0m [90m>>[0m [2mtype[0m=idle
+[90m[20:29:55.440][0m [94mSESSION_UPDATED         [0m [2m(metadata changed)[0m [90m>>[0m [2mtitle[0m=New session - 2026-06-07T13:29:50.915Z
+[90m[20:29:55.440][0m [93mSESSION_DIFF            [0m [2m(chat diff)[0m [90m>>[0m [2mcount[0m=0
+[90m[20:29:55.441][0m [92mMSG_UPDATED             [0m [2m(message changed)[0m [90m>>[0m [2mrole[0m=user [90m|[0m [2mtext[0m=ses_15db97bbcffeuP7VkISnd9s75u
+[90m[20:29:58.782][0m [94mSESSION_UPDATED         [0m [2m(metadata changed)[0m [90m>>[0m [2mtitle[0m=Initial Greeting
+[90m[20:30:31.533][0m [94mCHAT_MESSAGE            [0m [2m(chat payload)[0m [90m>>[0m [2magent[0m=build [90m|[0m [2mmodel[0m={"providerID":"openc [90m|[0m [2mparts[0m=1 [90m|[0m [2minputText[0m=ses_15db97bbcffeuP7VkISnd9s75u [90m|[0m [2moutputText[0m=msg_ea24722ed001wOJ4CX7S9dj0nR
+[90m[20:30:31.535][0m [92mMSG_UPDATED             [0m [2m(message changed)[0m [90m>>[0m [2mrole[0m=user [90m|[0m [2mtext[0m=ses_15db97bbcffeuP7VkISnd9s75u
+[90m[20:30:31.538][0m [94mSESSION_UPDATED         [0m [2m(metadata changed)[0m [90m>>[0m [2mtitle[0m=Initial Greeting
+[90m[20:30:31.539][0m [96mSESSION_STATUS          [0m [2m(session state)[0m [90m>>[0m [2mtype[0m=busy
+[90m[20:30:31.542][0m [92mMSG_UPDATED             [0m [2m(message changed)[0m [90m>>[0m [2mrole[0m=assistant [90m|[0m [2mmodel[0m=deepseek-v4-flash [90m|[0m [2mprovider[0m=opencode-go [90m|[0m [2mtext[0m=ses_15db97bbcffeuP7VkISnd9s75u
+[90m[20:30:31.547][0m [94mSESSION_UPDATED         [0m [2m(metadata changed)[0m [90m>>[0m [2mtitle[0m=Initial Greeting
+[90m[20:30:31.547][0m [93mSESSION_DIFF            [0m [2m(chat diff)[0m [90m>>[0m [2mcount[0m=0
+[90m[20:30:31.549][0m [92mMSG_UPDATED             [0m [2m(message changed)[0m [90m>>[0m [2mrole[0m=user [90m|[0m [2mtext[0m=ses_15db97bbcffeuP7VkISnd9s75u
+[90m[20:30:31.550][0m [96mSESSION_STATUS          [0m [2m(session state)[0m [90m>>[0m [2mtype[0m=busy
+[90m[20:30:31.551][0m [95mSYSTEM_TRANSFORM        [0m [2m(inject system prompt)[0m [90m>>[0m [2mblocks[0m=1
+[90m[20:30:31.551][0m [96mCHAT_PARAMS             [0m [2m(chat params)[0m [90m>>[0m [2magent[0m=build [90m|[0m [2mmodel[0m=deepseek-v4-flash
+[90m[20:30:33.494][0m [95mPART_REASONING          [0m [2m(model thinking)[0m
+[90m[20:30:33.824][0m [95mPART_REASONING          [0m [2m(model thinking)[0m [90m>>[0m [2mtext[0m=The user is asking my name. I should respond in Vietnamese with diacritics as per my instructions.
+[90m[20:30:34.085][0m [93mPART_STEP_FINISH        [0m [2m(reasoning step done)[0m [90m>>[0m [2mreason[0m=stop
+[90m[20:30:34.085][0m [92mMSG_UPDATED             [0m [2m(message changed)[0m [90m>>[0m [2mrole[0m=assistant [90m|[0m [2mmodel[0m=deepseek-v4-flash [90m|[0m [2mprovider[0m=opencode-go [90m|[0m [2mfinish[0m=stop [90m|[0m [2mtext[0m=ses_15db97bbcffeuP7VkISnd9s75u
+[90m[20:30:34.087][0m [92mMSG_UPDATED             [0m [2m(message changed)[0m [90m>>[0m [2mrole[0m=assistant [90m|[0m [2mmodel[0m=deepseek-v4-flash [90m|[0m [2mprovider[0m=opencode-go [90m|[0m [2mfinish[0m=stop [90m|[0m [2mtext[0m=ses_15db97bbcffeuP7VkISnd9s75u
+[90m[20:30:34.087][0m [96mSESSION_STATUS          [0m [2m(session state)[0m [90m>>[0m [2mtype[0m=busy
+[90m[20:30:34.088][0m [96mSESSION_STATUS          [0m [2m(session state)[0m [90m>>[0m [2mtype[0m=idle
+[90m[20:30:34.090][0m [94mSESSION_UPDATED         [0m [2m(metadata changed)[0m [90m>>[0m [2mtitle[0m=Initial Greeting
+[90m[20:30:34.090][0m [93mSESSION_DIFF            [0m [2m(chat diff)[0m [90m>>[0m [2mcount[0m=0
+[90m[20:30:34.091][0m [92mMSG_UPDATED             [0m [2m(message changed)[0m [90m>>[0m [2mrole[0m=user [90m|[0m [2mtext[0m=ses_15db97bbcffeuP7VkISnd9s75u
+[90m[20:30:44.082][0m [94mCHAT_MESSAGE            [0m [2m(chat payload)[0m [90m>>[0m [2magent[0m=build [90m|[0m [2mmodel[0m={"providerID":"openc [90m|[0m [2mparts[0m=1 [90m|[0m [2minputText[0m=ses_15db97bbcffeuP7VkISnd9s75u [90m|[0m [2moutputText[0m=msg_ea24753f2001Fcd7SrZnHXtXvT
+[90m[20:30:44.083][0m [92mMSG_UPDATED             [0m [2m(message changed)[0m [90m>>[0m [2mrole[0m=user [90m|[0m [2mtext[0m=ses_15db97bbcffeuP7VkISnd9s75u
+[90m[20:30:44.085][0m [94mSESSION_UPDATED         [0m [2m(metadata changed)[0m [90m>>[0m [2mtitle[0m=Initial Greeting
+[90m[20:30:44.086][0m [96mSESSION_STATUS          [0m [2m(session state)[0m [90m>>[0m [2mtype[0m=busy
+[90m[20:30:44.087][0m [92mMSG_UPDATED             [0m [2m(message changed)[0m [90m>>[0m [2mrole[0m=assistant [90m|[0m [2mmodel[0m=deepseek-v4-flash [90m|[0m [2mprovider[0m=opencode-go [90m|[0m [2mtext[0m=ses_15db97bbcffeuP7VkISnd9s75u
+[90m[20:30:44.091][0m [94mSESSION_UPDATED         [0m [2m(metadata changed)[0m [90m>>[0m [2mtitle[0m=Initial Greeting
+[90m[20:30:44.091][0m [93mSESSION_DIFF            [0m [2m(chat diff)[0m [90m>>[0m [2mcount[0m=0
+[90m[20:30:44.092][0m [92mMSG_UPDATED             [0m [2m(message changed)[0m [90m>>[0m [2mrole[0m=user [90m|[0m [2mtext[0m=ses_15db97bbcffeuP7VkISnd9s75u
+[90m[20:30:44.093][0m [96mSESSION_STATUS          [0m [2m(session state)[0m [90m>>[0m [2mtype[0m=busy
+[90m[20:30:44.093][0m [95mSYSTEM_TRANSFORM        [0m [2m(inject system prompt)[0m [90m>>[0m [2mblocks[0m=1
+[90m[20:30:44.093][0m [96mCHAT_PARAMS             [0m [2m(chat params)[0m [90m>>[0m [2magent[0m=build [90m|[0m [2mmodel[0m=deepseek-v4-flash
+[90m[20:30:45.884][0m [95mPART_REASONING          [0m [2m(model thinking)[0m
+[90m[20:30:46.282][0m [95mPART_REASONING          [0m [2m(model thinking)[0m [90m>>[0m [2mtext[0m=The user wants me to create a simple text file. Let me ask where they want it created.
+[90m[20:30:47.069][0m [93mTOOL_BEFORE             [0m [2m(pre-tool args)[0m [90m>>[0m [2mtool[0m=question [90m|[0m [2margs[0m=questions
+[90m[20:30:47.072][0m [94mTOOL_RUNNING            [0m [2m(tool started)[0m [90m>>[0m [2mtool[0m=question [90m|[0m [2mcall[0m=call_00_Aq
+[90m[20:31:05.240][0m [92mTOOL_COMPLETED          [0m [2m(tool finished)[0m [90m>>[0m [2mtool[0m=question [90m|[0m [2mdur[0m=18167ms [90m|[0m [2mtitle[0m=Asked 1 question
+[90m[20:31:05.242][0m [93mPART_STEP_FINISH        [0m [2m(reasoning step done)[0m [90m>>[0m [2mreason[0m=tool-calls
+[90m[20:31:05.243][0m [92mMSG_UPDATED             [0m [2m(message changed)[0m [90m>>[0m [2mrole[0m=assistant [90m|[0m [2mmodel[0m=deepseek-v4-flash [90m|[0m [2mprovider[0m=opencode-go [90m|[0m [2mfinish[0m=tool-calls [90m|[0m [2mtext[0m=ses_15db97bbcffeuP7VkISnd9s75u
+[90m[20:31:05.245][0m [92mMSG_UPDATED             [0m [2m(message changed)[0m [90m>>[0m [2mrole[0m=assistant [90m|[0m [2mmodel[0m=deepseek-v4-flash [90m|[0m [2mprovider[0m=opencode-go [90m|[0m [2mfinish[0m=tool-calls [90m|[0m [2mtext[0m=ses_15db97bbcffeuP7VkISnd9s75u
+[90m[20:31:05.245][0m [96mSESSION_STATUS          [0m [2m(session state)[0m [90m>>[0m [2mtype[0m=busy
+[90m[20:31:05.247][0m [92mMSG_UPDATED             [0m [2m(message changed)[0m [90m>>[0m [2mrole[0m=assistant [90m|[0m [2mmodel[0m=deepseek-v4-flash [90m|[0m [2mprovider[0m=opencode-go [90m|[0m [2mtext[0m=ses_15db97bbcffeuP7VkISnd9s75u
+[90m[20:31:05.251][0m [94mSESSION_UPDATED         [0m [2m(metadata changed)[0m [90m>>[0m [2mtitle[0m=Initial Greeting
+[90m[20:31:05.251][0m [93mSESSION_DIFF            [0m [2m(chat diff)[0m [90m>>[0m [2mcount[0m=0
+[90m[20:31:05.252][0m [92mMSG_UPDATED             [0m [2m(message changed)[0m [90m>>[0m [2mrole[0m=user [90m|[0m [2mtext[0m=ses_15db97bbcffeuP7VkISnd9s75u
+[90m[20:31:05.253][0m [96mSESSION_STATUS          [0m [2m(session state)[0m [90m>>[0m [2mtype[0m=busy
+[90m[20:31:05.254][0m [95mSYSTEM_TRANSFORM        [0m [2m(inject system prompt)[0m [90m>>[0m [2mblocks[0m=1
+[90m[20:31:05.254][0m [96mCHAT_PARAMS             [0m [2m(chat params)[0m [90m>>[0m [2magent[0m=build [90m|[0m [2mmodel[0m=deepseek-v4-flash
+[90m[20:31:07.163][0m [95mPART_REASONING          [0m [2m(model thinking)[0m
+[90m[20:31:07.632][0m [95mPART_REASONING          [0m [2m(model thinking)[0m [90m>>[0m [2mtext[0m=The user wants me to create a simple text file at /home/kuromi/test.txt, then delete it after. Let m
+[90m[20:31:08.000][0m [93mTOOL_BEFORE             [0m [2m(pre-tool args)[0m [90m>>[0m [2mtool[0m=write [90m|[0m [2margs[0m=filePath,content
+[90m[20:31:08.002][0m [94mTOOL_RUNNING            [0m [2m(tool started)[0m [90m>>[0m [2mtool[0m=write [90m|[0m [2mcall[0m=call_00_py
+[90m[20:31:08.005][0m [94mFILE_EDITED             [0m [2m(file changed)[0m [90m>>[0m [2mfile[0m=/home/kuromi/test.txt
+[90m[20:31:08.008][0m [92mTOOL_COMPLETED          [0m [2m(tool finished)[0m [90m>>[0m [2mtool[0m=write [90m|[0m [2mdur[0m=6ms [90m|[0m [2mtitle[0m=home/kuromi/test.txt
+[90m[20:31:08.066][0m [93mPART_STEP_FINISH        [0m [2m(reasoning step done)[0m [90m>>[0m [2mreason[0m=tool-calls
+[90m[20:31:08.067][0m [92mMSG_UPDATED             [0m [2m(message changed)[0m [90m>>[0m [2mrole[0m=assistant [90m|[0m [2mmodel[0m=deepseek-v4-flash [90m|[0m [2mprovider[0m=opencode-go [90m|[0m [2mfinish[0m=tool-calls [90m|[0m [2mtext[0m=ses_15db97bbcffeuP7VkISnd9s75u
+[90m[20:31:08.068][0m [92mMSG_UPDATED             [0m [2m(message changed)[0m [90m>>[0m [2mrole[0m=assistant [90m|[0m [2mmodel[0m=deepseek-v4-flash [90m|[0m [2mprovider[0m=opencode-go [90m|[0m [2mfinish[0m=tool-calls [90m|[0m [2mtext[0m=ses_15db97bbcffeuP7VkISnd9s75u
+[90m[20:31:08.068][0m [96mSESSION_STATUS          [0m [2m(session state)[0m [90m>>[0m [2mtype[0m=busy
+[90m[20:31:08.070][0m [92mMSG_UPDATED             [0m [2m(message changed)[0m [90m>>[0m [2mrole[0m=assistant [90m|[0m [2mmodel[0m=deepseek-v4-flash [90m|[0m [2mprovider[0m=opencode-go [90m|[0m [2mtext[0m=ses_15db97bbcffeuP7VkISnd9s75u
+[90m[20:31:08.073][0m [94mSESSION_UPDATED         [0m [2m(metadata changed)[0m [90m>>[0m [2mtitle[0m=Initial Greeting
+[90m[20:31:08.074][0m [93mSESSION_DIFF            [0m [2m(chat diff)[0m [90m>>[0m [2mcount[0m=0
+[90m[20:31:08.075][0m [92mMSG_UPDATED             [0m [2m(message changed)[0m [90m>>[0m [2mrole[0m=user [90m|[0m [2mtext[0m=ses_15db97bbcffeuP7VkISnd9s75u
+[90m[20:31:08.075][0m [96mSESSION_STATUS          [0m [2m(session state)[0m [90m>>[0m [2mtype[0m=busy
+[90m[20:31:08.076][0m [95mSYSTEM_TRANSFORM        [0m [2m(inject system prompt)[0m [90m>>[0m [2mblocks[0m=1
+[90m[20:31:08.076][0m [96mCHAT_PARAMS             [0m [2m(chat params)[0m [90m>>[0m [2magent[0m=build [90m|[0m [2mmodel[0m=deepseek-v4-flash
+[90m[20:31:09.868][0m [95mPART_REASONING          [0m [2m(model thinking)[0m
+[90m[20:31:10.212][0m [95mPART_REASONING          [0m [2m(model thinking)[0m [90m>>[0m [2mtext[0m=Now the user said to delete it after creating. Let me delete it.
+[90m[20:31:10.465][0m [93mTOOL_BEFORE             [0m [2m(pre-tool args)[0m [90m>>[0m [2mtool[0m=bash [90m|[0m [2margs[0m=command,description
+[90m[20:31:10.467][0m [94mTOOL_RUNNING            [0m [2m(tool started)[0m [90m>>[0m [2mtool[0m=bash [90m|[0m [2mcall[0m=call_00_nL
+[90m[20:31:10.499][0m [94mTOOL_RUNNING            [0m [2m(tool started)[0m [90m>>[0m [2mtool[0m=bash [90m|[0m [2mcall[0m=call_00_nL
+[90m[20:31:10.504][0m [92mTOOL_COMPLETED          [0m [2m(tool finished)[0m [90m>>[0m [2mtool[0m=bash [90m|[0m [2mdur[0m=5ms [90m|[0m [2mtitle[0m=Xoá file test.txt
+[90m[20:31:10.557][0m [93mPART_STEP_FINISH        [0m [2m(reasoning step done)[0m [90m>>[0m [2mreason[0m=tool-calls
+[90m[20:31:10.558][0m [92mMSG_UPDATED             [0m [2m(message changed)[0m [90m>>[0m [2mrole[0m=assistant [90m|[0m [2mmodel[0m=deepseek-v4-flash [90m|[0m [2mprovider[0m=opencode-go [90m|[0m [2mfinish[0m=tool-calls [90m|[0m [2mtext[0m=ses_15db97bbcffeuP7VkISnd9s75u
+[90m[20:31:10.560][0m [92mMSG_UPDATED             [0m [2m(message changed)[0m [90m>>[0m [2mrole[0m=assistant [90m|[0m [2mmodel[0m=deepseek-v4-flash [90m|[0m [2mprovider[0m=opencode-go [90m|[0m [2mfinish[0m=tool-calls [90m|[0m [2mtext[0m=ses_15db97bbcffeuP7VkISnd9s75u
+[90m[20:31:10.560][0m [96mSESSION_STATUS          [0m [2m(session state)[0m [90m>>[0m [2mtype[0m=busy
+[90m[20:31:10.562][0m [92mMSG_UPDATED             [0m [2m(message changed)[0m [90m>>[0m [2mrole[0m=assistant [90m|[0m [2mmodel[0m=deepseek-v4-flash [90m|[0m [2mprovider[0m=opencode-go [90m|[0m [2mtext[0m=ses_15db97bbcffeuP7VkISnd9s75u
+[90m[20:31:10.566][0m [94mSESSION_UPDATED         [0m [2m(metadata changed)[0m [90m>>[0m [2mtitle[0m=Initial Greeting
+[90m[20:31:10.566][0m [93mSESSION_DIFF            [0m [2m(chat diff)[0m [90m>>[0m [2mcount[0m=0
+[90m[20:31:10.567][0m [92mMSG_UPDATED             [0m [2m(message changed)[0m [90m>>[0m [2mrole[0m=user [90m|[0m [2mtext[0m=ses_15db97bbcffeuP7VkISnd9s75u
+[90m[20:31:10.568][0m [96mSESSION_STATUS          [0m [2m(session state)[0m [90m>>[0m [2mtype[0m=busy
+[90m[20:31:10.568][0m [95mSYSTEM_TRANSFORM        [0m [2m(inject system prompt)[0m [90m>>[0m [2mblocks[0m=1
+[90m[20:31:10.568][0m [96mCHAT_PARAMS             [0m [2m(chat params)[0m [90m>>[0m [2magent[0m=build [90m|[0m [2mmodel[0m=deepseek-v4-flash
+[90m[20:31:12.524][0m [95mPART_REASONING          [0m [2m(model thinking)[0m
+[90m[20:31:12.787][0m [95mPART_REASONING          [0m [2m(model thinking)[0m [90m>>[0m [2mtext[0m=Done. Created and deleted the file as requested.
+[90m[20:31:12.962][0m [93mPART_STEP_FINISH        [0m [2m(reasoning step done)[0m [90m>>[0m [2mreason[0m=stop
+[90m[20:31:12.963][0m [92mMSG_UPDATED             [0m [2m(message changed)[0m [90m>>[0m [2mrole[0m=assistant [90m|[0m [2mmodel[0m=deepseek-v4-flash [90m|[0m [2mprovider[0m=opencode-go [90m|[0m [2mfinish[0m=stop [90m|[0m [2mtext[0m=ses_15db97bbcffeuP7VkISnd9s75u
+[90m[20:31:12.964][0m [92mMSG_UPDATED             [0m [2m(message changed)[0m [90m>>[0m [2mrole[0m=assistant [90m|[0m [2mmodel[0m=deepseek-v4-flash [90m|[0m [2mprovider[0m=opencode-go [90m|[0m [2mfinish[0m=stop [90m|[0m [2mtext[0m=ses_15db97bbcffeuP7VkISnd9s75u
+[90m[20:31:12.964][0m [96mSESSION_STATUS          [0m [2m(session state)[0m [90m>>[0m [2mtype[0m=busy
+[90m[20:31:12.965][0m [96mSESSION_STATUS          [0m [2m(session state)[0m [90m>>[0m [2mtype[0m=idle
+[90m[20:31:12.967][0m [94mSESSION_UPDATED         [0m [2m(metadata changed)[0m [90m>>[0m [2mtitle[0m=Initial Greeting
+[90m[20:31:12.967][0m [93mSESSION_DIFF            [0m [2m(chat diff)[0m [90m>>[0m [2mcount[0m=0
+[90m[20:31:12.968][0m [92mMSG_UPDATED             [0m [2m(message changed)[0m [90m>>[0m [2mrole[0m=user [90m|[0m [2mtext[0m=ses_15db97bbcffeuP7VkISnd9s75u
