@@ -1,7 +1,7 @@
 {
   "name": "kuromi-plugin-opencode",
   "version": "1.0.0",
-  "description": "Demo plugin — hooks ALL OpenCode events and logs to ~/.opencode-kuromi-hooks.log for debugging/learning",
+  "description": "Demo plugin — hooks ALL OpenCode events and writes colorized logs to plugins-test/kuromi-plugin-opencode/log.log",
   "author": {
     "name": "kurom1ii",
     "url": "https://github.com/kurom1ii"

@@ -1,9 +1,7 @@
-/// <reference types="bun" />
 
 import type { Plugin } from "@opencode-ai/plugin"
-
-// Kuromi hook demo — chỉ dùng console.error cho server plugin
-// Server plugin KHÔNG có $ (Bun shell helper)
+import { appendFileSync, mkdirSync } from "node:fs"
+import { dirname } from "node:path"
 
 function safeSlice(v: unknown, max: number): string {
   if (typeof v === "string") return v.slice(0, max)
@@ -11,13 +9,111 @@ function safeSlice(v: unknown, max: number): string {
   try { return JSON.stringify(v).slice(0, max) } catch { return "" }
 }
 
-const SEP = "─".repeat(60)
+const LOG_PATH = "/home/kuromi/work/mywork/mem-agent/plugins-test/kuromi-plugin-opencode/log.log"
+const SEP = "─".repeat(92)
+const LABEL_WIDTH = 24
 let sessionCount = 0
 let sessionId = ""
 
+const ANSI = {
+  reset: "\x1b[0m",
+  dim: "\x1b[2m",
+  bold: "\x1b[1m",
+  gray: "\x1b[90m",
+  red: "\x1b[91m",
+  green: "\x1b[92m",
+  yellow: "\x1b[93m",
+  blue: "\x1b[94m",
+  magenta: "\x1b[95m",
+  cyan: "\x1b[96m",
+  white: "\x1b[97m",
+} as const
+
+const LABEL_COLORS: Record<string, string> = {
+  PLUGIN_LOADED: ANSI.bold + ANSI.white,
+  SESSION_CREATED: ANSI.bold + ANSI.green,
+  SESSION_STATUS: ANSI.cyan,
+  SESSION_COMPACTED: ANSI.magenta,
+  SESSION_UPDATED: ANSI.blue,
+  SESSION_DIFF: ANSI.yellow,
+  SESSION_DELETED: ANSI.bold + ANSI.red,
+  SESSION_ERROR: ANSI.bold + ANSI.red,
+  MSG_UPDATED: ANSI.green,
+  MSG_REMOVED: ANSI.red,
+  PART_SUBTASK: ANSI.cyan,
+  TOOL_RUNNING: ANSI.blue,
+  TOOL_COMPLETED: ANSI.green,
+  TOOL_ERROR: ANSI.red,
+  PART_STEP_FINISH: ANSI.yellow,
+  PART_REASONING: ANSI.magenta,
+  PART_FILE: ANSI.white,
+  PART_PATCH: ANSI.yellow,
+  PART_COMPACTION: ANSI.magenta,
+  PART_AGENT: ANSI.cyan,
+  PART_RETRY: ANSI.yellow,
+  FILE_EDITED: ANSI.blue,
+  PERMISSION_UPDATED: ANSI.yellow,
+  PERMISSION_REPLIED: ANSI.green,
+  TODO_UPDATED: ANSI.green,
+  COMMAND_EXECUTED: ANSI.cyan,
+  CHAT_MESSAGE: ANSI.blue,
+  CHAT_PARAMS: ANSI.cyan,
+  SYSTEM_TRANSFORM: ANSI.magenta,
+  TOOL_BEFORE: ANSI.yellow,
+  CONFIG: ANSI.white,
+  SECTION: ANSI.dim + ANSI.gray,
+} as const
+
+mkdirSync(dirname(LOG_PATH), { recursive: true })
+
+function nowStamp(): string {
+  const d = new Date()
+  const hh = String(d.getHours()).padStart(2, "0")
+  const mm = String(d.getMinutes()).padStart(2, "0")
+  const ss = String(d.getSeconds()).padStart(2, "0")
+  const ms = String(d.getMilliseconds()).padStart(3, "0")
+  return `${hh}:${mm}:${ss}.${ms}`
+}
+
+function padLabel(label: string): string {
+  return label.padEnd(LABEL_WIDTH, " ")
+}
+
+function fmtValue(v: unknown): string {
+  return safeSlice(v, 220).replace(/\s+/g, " ").trim()
+}
+
+function fmtFields(fields: Record<string, unknown>): string {
+  return Object.entries(fields)
+    .filter(([, value]) => value !== "" && value != null)
+    .map(([key, value]) => `${ANSI.dim}${key}${ANSI.reset}=${fmtValue(value)}`)
+    .join(` ${ANSI.gray}|${ANSI.reset} `)
+}
+
+function rawWrite(line: string): void {
+  appendFileSync(LOG_PATH, `${line}\n`)
+}
+
+function logLine(label: string, fields: Record<string, unknown> = {}): void {
+  const color = LABEL_COLORS[label] || ANSI.white
+  const head = `${ANSI.gray}[${nowStamp()}]${ANSI.reset} ${color}${padLabel(label)}${ANSI.reset}`
+  const body = fmtFields(fields)
+  rawWrite(body ? `${head} ${ANSI.gray}>>${ANSI.reset} ${body}` : head)
+}
+
+function logSection(title: string): void {
+  rawWrite(`${LABEL_COLORS.SECTION}${SEP}${ANSI.reset}`)
+  logLine("SECTION", { title, session: sessionId || "-" })
+  rawWrite(`${LABEL_COLORS.SECTION}${SEP}${ANSI.reset}`)
+}
+
 export const KuromiPlugin: Plugin = async (ctx) => {
   const project = ctx.worktree || "?"
-  console.error(`[KUROMI] == PLUGIN_LOADED | project=${project} | pid=${process?.pid}`)
+  logLine("PLUGIN_LOADED", {
+    project,
+    pid: process?.pid,
+    log: LOG_PATH,
+  })
 
   return {
     event: async ({ event }) => {
@@ -30,38 +126,54 @@ export const KuromiPlugin: Plugin = async (ctx) => {
         sessionCount++
         const info = props.info || {}
         sessionId = safeSlice(info.id, 20)
-        console.error(`[KUROMI] SESSION.CREATED       | id=${sessionId} title=${safeSlice(info.title, 80)} count=${sessionCount}`)
-        console.error(`[KUROMI] ${SEP}`)
+        logSection("SESSION START")
+        logLine("SESSION_CREATED", {
+          id: sessionId,
+          title: safeSlice(info.title, 80),
+          count: sessionCount,
+        })
       }
 
       if (type === "session.status") {
         const s = props.status || {}
-        console.error(`[KUROMI] SESSION.STATUS        | type=${safeSlice(s.type, 20)} attempt=${s.attempt ?? ""}`)
+        logLine("SESSION_STATUS", {
+          type: safeSlice(s.type, 20),
+          attempt: s.attempt ?? "",
+        })
       }
 
       if (type === "session.compacted") {
-        console.error(`[KUROMI] SESSION.COMPACTED`)
+        logLine("SESSION_COMPACTED")
       }
 
       if (type === "session.updated") {
         const info = props.info || {}
-        console.error(`[KUROMI] SESSION.UPDATED       | title=${safeSlice(info.title, 80)}`)
+        logLine("SESSION_UPDATED", {
+          title: safeSlice(info.title, 80),
+        })
       }
 
       if (type === "session.diff") {
         const diffs = Array.isArray(props.diff) ? props.diff : []
         const files = diffs.map((d: any) => d.file).slice(0, 5).join(" | ")
-        console.error(`[KUROMI] SESSION.DIFF          | count=${diffs.length} files=${files}`)
+        logLine("SESSION_DIFF", {
+          count: diffs.length,
+          files,
+        })
       }
 
       if (type === "session.deleted") {
         const sid = props.info?.id || props.sessionID
-        console.error(`[KUROMI] SESSION.DELETED       | id=${safeSlice(sid, 20)}`)
-        console.error(`[KUROMI] ${SEP}`)
+        logLine("SESSION_DELETED", {
+          id: safeSlice(sid, 20),
+        })
+        logSection("SESSION END")
       }
 
       if (type === "session.error") {
-        console.error(`[KUROMI] SESSION.ERROR         | err=${safeSlice(props.error, 200)}`)
+        logLine("SESSION_ERROR", {
+          err: safeSlice(props.error, 200),
+        })
       }
 
       // --- MESSAGE EVENTS ---
@@ -69,12 +181,18 @@ export const KuromiPlugin: Plugin = async (ctx) => {
       if (type === "message.updated") {
         const info = props.info || {}
         if (info.role === "assistant") {
-          console.error(`[KUROMI] MSG.UPDATED           | role=assistant model=${safeSlice(info.modelID, 30)} finish=${safeSlice(info.finish, 10)}`)
+          logLine("MSG_UPDATED", {
+            role: "assistant",
+            model: safeSlice(info.modelID, 30),
+            finish: safeSlice(info.finish, 10),
+          })
         }
       }
 
       if (type === "message.removed") {
-        console.error(`[KUROMI] MSG.REMOVED           | msgID=${safeSlice(props.messageID, 20)}`)
+        logLine("MSG_REMOVED", {
+          msgID: safeSlice(props.messageID, 20),
+        })
       }
 
       // --- MESSAGE PART EVENTS ---
@@ -83,7 +201,10 @@ export const KuromiPlugin: Plugin = async (ctx) => {
         const part = props.part || {}
 
         if (part.type === "subtask") {
-          console.error(`[KUROMI] PART.SUBTASK          | agent=${safeSlice(part.agent, 20)} desc=${safeSlice(part.description, 80)}`)
+          logLine("PART_SUBTASK", {
+            agent: safeSlice(part.agent, 20),
+            desc: safeSlice(part.description, 80),
+          })
         }
 
         if (part.type === "tool") {
@@ -95,95 +216,148 @@ export const KuromiPlugin: Plugin = async (ctx) => {
           if (status === "completed") {
             const t = (state.time as any) || {}
             const dur = t.start && t.end ? `${t.end - t.start}ms` : "?"
-            console.error(`[KUROMI] TOOL.COMPLETED        | tool=${tool} dur=${dur} title=${safeSlice(state.title, 60)}`)
+            logLine("TOOL_COMPLETED", {
+              tool,
+              dur,
+              title: safeSlice(state.title, 60),
+            })
           }
           if (status === "error") {
-            console.error(`[KUROMI] TOOL.ERROR            | tool=${tool} err=${safeSlice(state.error, 150)}`)
+            logLine("TOOL_ERROR", {
+              tool,
+              err: safeSlice(state.error, 150),
+            })
           }
           if (status === "running") {
-            console.error(`[KUROMI] TOOL.RUNNING          | tool=${tool} call=${call}`)
+            logLine("TOOL_RUNNING", {
+              tool,
+              call,
+            })
           }
         }
 
         if (part.type === "step-finish") {
-          console.error(`[KUROMI] PART.STEP-FINISH      | reason=${safeSlice(part.reason, 20)}`)
+          logLine("PART_STEP_FINISH", {
+            reason: safeSlice(part.reason, 20),
+          })
         }
 
         if (part.type === "reasoning") {
-          console.error(`[KUROMI] PART.REASONING        | text=${safeSlice((part as any).text, 100)}`)
+          logLine("PART_REASONING", {
+            text: safeSlice((part as any).text, 100),
+          })
         }
 
         if (part.type === "file") {
-          console.error(`[KUROMI] PART.FILE             | file=${safeSlice((part as any).filename, 60)}`)
+          logLine("PART_FILE", {
+            file: safeSlice((part as any).filename, 60),
+          })
         }
 
         if (part.type === "patch") {
           const pf = (part as any).files || []
-          console.error(`[KUROMI] PART.PATCH            | files=${pf.slice(0, 5).join(" | ")}`)
+          logLine("PART_PATCH", {
+            files: pf.slice(0, 5).join(" | "),
+          })
         }
 
         if (part.type === "compaction") {
-          console.error(`[KUROMI] PART.COMPACTION       | auto=${(part as any).auto ?? ""}`)
+          logLine("PART_COMPACTION", {
+            auto: (part as any).auto ?? "",
+          })
         }
 
         if (part.type === "agent") {
-          console.error(`[KUROMI] PART.AGENT            | name=${safeSlice((part as any).name, 20)}`)
+          logLine("PART_AGENT", {
+            name: safeSlice((part as any).name, 20),
+          })
         }
 
         if (part.type === "retry") {
-          console.error(`[KUROMI] PART.RETRY            | attempt=${(part as any).attempt ?? ""}`)
+          logLine("PART_RETRY", {
+            attempt: (part as any).attempt ?? "",
+          })
         }
       }
 
       // --- FILE / PERMISSION / TASK / COMMAND ---
 
       if (type === "file.edited") {
-        console.error(`[KUROMI] FILE.EDITED           | file=${safeSlice(props.file, 80)}`)
+        logLine("FILE_EDITED", {
+          file: safeSlice(props.file, 80),
+        })
       }
 
       if (type === "permission.updated") {
-        console.error(`[KUROMI] PERMISSION.UPDATED     | type=${safeSlice(props.type, 15)} pattern=${safeSlice(props.pattern, 60)}`)
+        logLine("PERMISSION_UPDATED", {
+          type: safeSlice(props.type, 15),
+          pattern: safeSlice(props.pattern, 60),
+        })
       }
 
       if (type === "permission.replied") {
-        console.error(`[KUROMI] PERMISSION.REPLIED     | reply=${safeSlice(props.response || props.reply, 20)}`)
+        logLine("PERMISSION_REPLIED", {
+          reply: safeSlice(props.response || props.reply, 20),
+        })
       }
 
       if (type === "todo.updated") {
         const todos = Array.isArray(props.todos) ? props.todos : []
         const done = todos.filter((t: any) => t.status === "completed").length
         const active = todos.filter((t: any) => t.status !== "completed").length
-        console.error(`[KUROMI] TODO.UPDATED          | total=${todos.length} done=${done} active=${active}`)
+        logLine("TODO_UPDATED", {
+          total: todos.length,
+          done,
+          active,
+        })
       }
 
       if (type === "command.executed") {
-        console.error(`[KUROMI] COMMAND.EXECUTED      | name=${safeSlice(props.name, 20)} args=${safeSlice(props.arguments, 60)}`)
+        logLine("COMMAND_EXECUTED", {
+          name: safeSlice(props.name, 20),
+          args: safeSlice(props.arguments, 60),
+        })
       }
     },
 
     // HOOKS
     "chat.message": async (input, _o) => {
       const parts = (_o as any)?.parts || []
-      console.error(`[KUROMI] CHAT.MESSAGE          | agent=${safeSlice(input.agent, 15)} model=${safeSlice(input.model, 20)} parts=${parts.length}`)
+      logLine("CHAT_MESSAGE", {
+        agent: safeSlice(input.agent, 15),
+        model: safeSlice(input.model, 20),
+        parts: parts.length,
+      })
     },
 
     "chat.params": async (input, _o) => {
-      console.error(`[KUROMI] CHAT.PARAMS           | agent=${safeSlice(input.agent, 15)} model=${safeSlice(input.model?.id || input.model, 30)}`)
+      logLine("CHAT_PARAMS", {
+        agent: safeSlice(input.agent, 15),
+        model: safeSlice(input.model?.id || input.model, 30),
+      })
     },
 
     "experimental.chat.system.transform": async (_i, output) => {
       if (!Array.isArray(output.system)) return
-      console.error(`[KUROMI] SYSTEM.TRANSFORM      | blocks=${output.system.length}`)
+      logLine("SYSTEM_TRANSFORM", {
+        blocks: output.system.length,
+      })
     },
 
     "tool.execute.before": async (input, output) => {
       const args = (output as any)?.args || {}
       const keys = Object.keys(args).join(",").slice(0, 80)
-      console.error(`[KUROMI] TOOL.BEFORE           | tool=${safeSlice(input.tool, 15)} args=${keys}`)
+      logLine("TOOL_BEFORE", {
+        tool: safeSlice(input.tool, 15),
+        args: keys,
+      })
     },
 
     config: async (input) => {
-      console.error(`[KUROMI] CONFIG                | model=${safeSlice(input.model?.id, 30)} agent=${safeSlice(input.agent?.id, 15)}`)
+      logLine("CONFIG", {
+        model: safeSlice(input.model, 30),
+        agent: safeSlice(input.agent?.id, 15),
+      })
     },
   }
 }

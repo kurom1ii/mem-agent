@@ -11,17 +11,17 @@ cp -r plugins-test/kuromi-plugin-opencode ~/.config/opencode/plugins/kuromi-plug
 ## Xem log
 
 ```bash
-# Real-time (trong thư mục project)
-tail -f .kuromi-hooks.log
+# Real-time
+tail -f /home/kuromi/work/mywork/mem-agent/plugins-test/kuromi-plugin-opencode/log.log
 
 # Xóa log cũ
-rm .kuromi-hooks.log
+rm /home/kuromi/work/mywork/mem-agent/plugins-test/kuromi-plugin-opencode/log.log
 ```
 
 ## Format log
 
 ```
-[HH:MM:SS.mmm] HOOK_NAME____________________ │ key1=val1 key2=val2 ...
+[HH:MM:SS.mmm] COLOR_LABEL______________ >> key=value | key=value ...
 ```
 
 ## Danh sách hook được minh họa
