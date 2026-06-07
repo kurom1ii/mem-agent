@@ -1,0 +1,11 @@
+{
+  "name": "kuromi-plugin-opencode",
+  "version": "1.0.0",
+  "description": "Demo plugin — hooks ALL OpenCode events and logs to ~/.opencode-kuromi-hooks.log for debugging/learning",
+  "author": {
+    "name": "kurom1ii",
+    "url": "https://github.com/kurom1ii"
+  },
+  "license": "MIT",
+  "entry": "kuromi-capture.ts"
+}
