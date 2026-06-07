@@ -1,389 +1,309 @@
-import type { Plugin } from "@opencode-ai/plugin";
-import * as fs from "fs";
-import * as path from "path";
+import type { Plugin } from "@opencode-ai/plugin"
 
 // =====================================================================
-// kuromi-plugin-opencode — Hook Demo Plugin
+// kuromi-plugin-opencode — Hook Demo Plugin (OpenCode native runtime)
 // =====================================================================
 // Plugin minh họa: hook TOÀN BỘ các hook có thể trong OpenCode.
-// Mỗi hook ghi 1 dòng log vào file .kuromi-hooks.log
-// trong WORKING DIRECTORY của project hiện tại.
+// Mỗi hook ghi 1 dòng timestamp vào file .kuromi-hooks.log trong CWD.
 //
-// KHÔNG làm gì khác ngoài in log. Dùng để kiểm tra hook nào
-// thực sự được kích hoạt trong từng tình huống.
+// ⚠️ OpenCode plugin chạy trong Go runtime (không phải Node.js).
+//    Chỉ được dùng: $ (shell helper), ctx (project context).
+//    KHÔNG được import fs, path, os, process, hay bất kỳ Node.js API nào.
+//    Mọi I/O phải qua `$` chạy lệnh shell.
 // =====================================================================
 
-const LOG_FILE = path.join(process.cwd(), ".kuromi-hooks.log");
-const MAX_LOG_SIZE = 5 * 1024 * 1024; // 5MB
-const SEPARATOR = "─".repeat(80);
-
-function ensureLogFile(): void {
-  const dir = path.dirname(LOG_FILE);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-
-  // Reset log file on each plugin load
-  // Xóa log cũ, ghi header mới
-  fs.writeFileSync(LOG_FILE, "");
-}
-
-/**
- * Ghi 1 dòng timestamp vào log file.
- * Format: [HH:MM:SS.mmm] HOOK_NAME │ key1=val1 key2=val2 ...
- */
-function hookLog(hookName: string, data: Record<string, unknown> = {}): void {
-  const now = new Date();
-  const ts = now.toISOString().slice(11, 23).replace("T", " "); // HH:MM:SS.mmm
-
+// Dùng echo append vào log file thay vì fs.appendFileSync
+async function log(hookName: string, data: Record<string, string> = {}) {
+  const ts = new Date().toISOString().slice(11, 23).replace("T", " ")
   const parts = Object.entries(data)
     .filter(([_, v]) => v !== undefined && v !== null && v !== "")
-    .map(([k, v]) => {
-      const val = typeof v === "object" ? JSON.stringify(v).slice(0, 200) : String(v);
-      return `${k}=${val}`;
-    })
-    .join(" ");
-
-  const line = `[${ts}] ${hookName.padEnd(35)} │ ${parts}\n`;
-
+    .map(([k, v]) => `${k}=${v}`)
+    .join(" ")
+  const line = `[${ts}] ${hookName.padEnd(35)} │ ${parts}`
   try {
-    fs.appendFileSync(LOG_FILE, line);
-
-    // Rotate nếu file quá to
-    const stat = fs.statSync(LOG_FILE);
-    if (stat.size > MAX_LOG_SIZE) {
-      fs.writeFileSync(LOG_FILE, "");
-    }
+    // Dùng $ để echo append vào file log trong CWD
+    await $`echo ${line} >> .kuromi-hooks.log`.quiet().nothrow()
   } catch {
-    // silent fail — không để lỗi log làm crash plugin
+    // silent fail — log không được làm crash plugin
   }
 }
+
+function safeSlice(v: unknown, max: number): string {
+  if (typeof v === "string") return v.slice(0, max)
+  if (v == null) return ""
+  try { return JSON.stringify(v).slice(0, max) } catch { return "" }
+}
+
+const SEP = "─".repeat(60)
+let sessionCount = 0
 
 // =====================================================================
 // PLUGIN ENTRY
 // =====================================================================
 export const KuromiPlugin: Plugin = async (ctx) => {
-  ensureLogFile();
+  const project = ctx.worktree || "."
 
-  hookLog("╔ PLUGIN_LOADED", {
-    project: ctx.worktree || ctx.project?.id || process.cwd(),
-    pid: process.pid,
-    node: process.version,
-  });
+  // Reset log file khi plugin load
+  await $`rm -f .kuromi-hooks.log`.quiet().nothrow()
+  await log("╔ PLUGIN_LOADED", { project })
 
   return {
-    // ==================================================================
-    // 1. CONFIG — chạy 1 lần khi load config
-    // ==================================================================
-    config: async (input) => {
-      hookLog("📋 config", {
-        model_id: input.model?.id,
-        agent_id: input.agent?.id,
-        theme: input.theme,
-        autoupdate: input.autoupdate,
-      });
-    },
 
     // ==================================================================
-    // 2. EVENT HANDLER — Universal dispatcher, bắt TẤT CẢ sự kiện
+    // 1. EVENT HANDLER — bắt TẤT CẢ sự kiện session lifecycle
     // ==================================================================
     event: async ({ event }) => {
-      const type = event.type;
-      const props = (event as any).properties || {};
-      const ts = Date.now();
+      const type = event.type
+      const props = (event as any).properties || {}
 
-      // ─── SESSION LIFECYCLE ───
+      // ─── SESSION LIFECYCLE ─────────────────────────────
 
       if (type === "session.created") {
-        const info = props.info || {};
-        hookLog("🟢 session.created", {
-          id: (info.id as string)?.slice(0, 12),
-          title: info.title as string,
-          parentID: (info.parentID as string)?.slice(0, 12),
-        });
-        hookLog(SEPARATOR, { msg: "NEW SESSION STARTED" });
+        sessionCount++
+        const info = props.info || {}
+        await log("🟢 session.created", {
+          id: safeSlice(info.id, 12),
+          title: safeSlice(info.title, 80),
+          count: String(sessionCount),
+        })
+        await log(SEP, { msg: `SESSION #${sessionCount} STARTED` })
       }
 
       if (type === "session.status") {
-        const status = props.status || {};
-        hookLog("⏳ session.status", {
-          type: status.type as string,
-          attempt: status.attempt,
-          message: (status.message as string)?.slice(0, 100),
-        });
+        const s = props.status || {}
+        await log("⏳ session.status", {
+          type: safeSlice(s.type, 20),
+          attempt: String(s.attempt ?? ""),
+        })
       }
 
       if (type === "session.compacted") {
-        hookLog("🗜️  session.compacted", {});
+        await log("🗜️  session.compacted", {})
       }
 
       if (type === "session.updated") {
-        const info = props.info || {};
-        hookLog("📝 session.updated", {
-          id: (info.id as string)?.slice(0, 12),
-          title: info.title as string,
-        });
+        const info = props.info || {}
+        await log("📝 session.updated", { title: safeSlice(info.title, 80) })
       }
 
       if (type === "session.diff") {
-        const diffs = Array.isArray(props.diff) ? props.diff : [];
-        const files = diffs.map((d: any) => d.file).slice(0, 5);
-        hookLog("📊 session.diff", {
-          fileCount: diffs.length,
+        const diffs = Array.isArray(props.diff) ? props.diff : []
+        const files = diffs.map((d: any) => d.file).slice(0, 5)
+        await log("📊 session.diff", {
+          count: String(diffs.length),
           files: files.join(" | "),
-        });
+        })
       }
 
       if (type === "session.deleted") {
-        const sid = props.info?.id || props.sessionID;
-        hookLog("🔴 session.deleted", {
-          id: (sid as string)?.slice(0, 12),
-        });
-        hookLog(SEPARATOR, { msg: "SESSION ENDED" });
+        const sid = props.info?.id || props.sessionID
+        await log("🔴 session.deleted", { id: safeSlice(sid, 12) })
+        await log(SEP, { msg: "SESSION ENDED" })
       }
 
       if (type === "session.error") {
-        hookLog("💥 session.error", {
-          error: String(props.error || "").slice(0, 200),
-        });
+        await log("💥 session.error", {
+          err: safeSlice(props.error, 200),
+        })
       }
 
-      // ─── MESSAGE EVENTS ───
+      // ─── MESSAGE EVENTS ────────────────────────────────
 
       if (type === "message.updated") {
-        const info = props.info || {};
-        hookLog("💬 message.updated", {
-          id: (info.id as string)?.slice(0, 12),
-          role: info.role as string,
-          model: info.modelID as string,
-          mode: info.mode as string,
-          finish: info.finish as string,
-          cost: info.cost as number,
-        });
+        const info = props.info || {}
+        if (info.role === "assistant") {
+          await log("💬 message.updated", {
+            role: "assistant",
+            model: safeSlice(info.modelID, 30),
+            mode: safeSlice(info.mode, 10),
+            finish: safeSlice(info.finish, 10),
+            cost: String(info.cost ?? ""),
+          })
+        }
       }
 
       if (type === "message.removed") {
-        hookLog("🗑️  message.removed", {
-          messageID: (props.messageID as string)?.slice(0, 12),
-        });
+        await log("🗑️  message.removed", {
+          msgID: safeSlice(props.messageID, 12),
+        })
       }
 
-      // ─── MESSAGE PART EVENTS — CHI TIẾT NHẤT ───
+      // ─── MESSAGE PART EVENTS ───────────────────────────
 
       if (type === "message.part.updated") {
-        const part = props.part || {};
+        const part = props.part || {}
 
         if (part.type === "subtask") {
-          hookLog("🤖 part.subtask", {
-            subtask_id: (part.id as string)?.slice(0, 12),
-            agent: part.agent as string,
-            description: (part.description as string)?.slice(0, 100),
-            prompt: (part.prompt as string)?.slice(0, 100),
-          });
+          await log("🤖 part.subtask", {
+            agent: safeSlice(part.agent, 20),
+            desc: safeSlice(part.description, 80),
+          })
         }
 
         if (part.type === "tool") {
-          const state = part.state || {};
-          const toolName = part.tool as string;
-          const callId = (part.callID as string)?.slice(0, 8);
-          const status = state.status as string;
-
-          if (status === "running") {
-            hookLog("🔧 tool.running", {
-              tool: toolName,
-              callID: callId,
-            });
-          }
+          const state = part.state || {}
+          const tool = safeSlice(part.tool, 15)
+          const call = safeSlice(part.callID, 8)
+          const status = safeSlice(state.status, 10)
 
           if (status === "completed") {
-            const rawTime = (state.time as any) || {};
-            const dur =
-              rawTime.start && rawTime.end
-                ? `${rawTime.end - rawTime.start}ms`
-                : "?";
-            hookLog("✅ tool.completed", {
-              tool: toolName,
-              callID: callId,
-              duration: dur,
-              title: (state.title as string)?.slice(0, 80),
-              input: JSON.stringify(state.input || {}).slice(0, 150),
-              output: JSON.stringify(state.output || {}).slice(0, 150),
-            });
+            const t = (state.time as any) || {}
+            const dur = t.start && t.end ? `${t.end - t.start}ms` : "?"
+            await log("✅ tool.completed", {
+              tool,
+              callID: call,
+              dur,
+              title: safeSlice(state.title, 60),
+            })
           }
-
           if (status === "error") {
-            hookLog("❌ tool.error", {
-              tool: toolName,
-              callID: callId,
-              error: String(state.error || "").slice(0, 200),
-            });
+            await log("❌ tool.error", {
+              tool,
+              callID: call,
+              err: safeSlice(state.error, 150),
+            })
+          }
+          if (status === "running") {
+            await log("🔧 tool.running", { tool, callID: call })
           }
         }
 
         if (part.type === "step-finish") {
-          hookLog("🏁 part.step-finish", {
-            reason: part.reason as string,
-            cost: (part as any).cost,
-          });
+          await log("🏁 part.step-finish", {
+            reason: safeSlice(part.reason, 20),
+          })
         }
 
         if (part.type === "reasoning") {
-          hookLog("🧠 part.reasoning", {
-            text: ((part as any).text as string)?.slice(0, 150),
-          });
+          await log("🧠 part.reasoning", {
+            text: safeSlice((part as any).text, 100),
+          })
         }
 
         if (part.type === "file") {
-          hookLog("📄 part.file", {
-            filename: (part as any).filename || (part as any).url,
-          });
+          await log("📄 part.file", {
+            filename: safeSlice((part as any).filename, 60),
+          })
         }
 
         if (part.type === "patch") {
-          hookLog("🔀 part.patch", {
-            hash: (part as any).hash,
-            files: ((part as any).files || []).join(" | "),
-          });
+          const pf = (part as any).files || []
+          await log("🔀 part.patch", {
+            files: pf.slice(0, 5).join(" | "),
+          })
         }
 
         if (part.type === "compaction") {
-          hookLog("🗜️  part.compaction", {
-            auto: (part as any).auto,
-          });
+          await log("🗜️  part.compaction", { auto: String((part as any).auto ?? "") })
         }
 
         if (part.type === "agent") {
-          hookLog("👤 part.agent", {
-            name: (part as any).name,
-          });
+          await log("👤 part.agent", { name: safeSlice((part as any).name, 20) })
         }
 
         if (part.type === "retry") {
-          hookLog("🔄 part.retry", {
-            attempt: (part as any).attempt,
-            error: String((part as any).error || "").slice(0, 150),
-          });
+          await log("🔄 part.retry", {
+            attempt: String((part as any).attempt ?? ""),
+          })
         }
       }
 
-      // ─── FILE EVENTS ───
+      // ─── FILE EVENTS ───────────────────────────────────
 
       if (type === "file.edited") {
-        hookLog("✏️  file.edited", {
-          file: props.file as string,
-        });
+        await log("✏️  file.edited", { file: safeSlice(props.file, 80) })
       }
 
-      // ─── PERMISSION EVENTS ───
+      // ─── PERMISSION EVENTS ─────────────────────────────
 
       if (type === "permission.updated") {
-        hookLog("🔐 permission.updated", {
-          type: props.type as string,
-          pattern: Array.isArray(props.pattern)
-            ? props.pattern.join(", ")
-            : String(props.pattern || ""),
-          tool_call_id: (props.callID as string)?.slice(0, 8),
-          title: props.title as string,
-        });
+        await log("🔐 permission.updated", {
+          type: safeSlice(props.type, 15),
+          pattern: safeSlice(props.pattern, 60),
+        })
       }
 
       if (type === "permission.replied") {
-        hookLog("🔓 permission.replied", {
-          permission_id: (props.permissionID || props.requestID || "") as string,
-          response: (props.response || props.reply || "") as string,
-        });
+        await log("🔓 permission.replied", {
+          reply: safeSlice(props.response || props.reply, 20),
+        })
       }
 
-      // ─── TASK EVENTS ───
+      // ─── TASK EVENTS ───────────────────────────────────
 
       if (type === "todo.updated") {
-        const todos = Array.isArray(props.todos) ? props.todos : [];
-        const done = todos.filter((t: any) => t.status === "completed").length;
-        const active = todos.filter((t: any) => t.status !== "completed").length;
-        hookLog("✅ todo.updated", {
-          total: todos.length,
-          completed: done,
-          inProgress: active,
-        });
+        const todos = Array.isArray(props.todos) ? props.todos : []
+        const done = todos.filter((t: any) => t.status === "completed").length
+        const active = todos.filter((t: any) => t.status !== "completed").length
+        await log("✅ todo.updated", {
+          total: String(todos.length),
+          done: String(done),
+          active: String(active),
+        })
       }
 
-      // ─── COMMAND EVENTS ───
+      // ─── COMMAND EVENTS ────────────────────────────────
 
       if (type === "command.executed") {
-        hookLog("⌨️  command.executed", {
-          name: props.name as string,
-          arguments: (props.arguments || "") as string,
-        });
+        await log("⌨️  command.executed", {
+          name: safeSlice(props.name, 20),
+          args: safeSlice(props.arguments, 60),
+        })
       }
     },
 
     // ==================================================================
-    // 3. CHAT MESSAGE — user gửi hoặc AI trả lời
+    // 2. CHAT MESSAGE HOOK
     // ==================================================================
-    "chat.message": async (input, output) => {
-      const parts = output.parts || [];
-      const types = parts
-        .map((p: any) => p.type)
-        .filter(Boolean)
-        .join("+");
-      hookLog("💬 chat.message", {
-        agent: input.agent,
-        model: input.model,
-        parts: types || "empty",
-        partCount: parts.length,
-      });
+    "chat.message": async (input, _output) => {
+      const parts = (_output as any)?.parts || []
+      await log("💬 chat.message", {
+        agent: safeSlice(input.agent, 15),
+        model: safeSlice(input.model, 20),
+        parts: String(parts.length),
+      })
     },
 
     // ==================================================================
-    // 4. CHAT PARAMS — tham số model thay đổi
+    // 3. CHAT PARAMS HOOK
     // ==================================================================
-    "chat.params": async (input, output) => {
-      hookLog("⚙️  chat.params", {
-        agent: input.agent,
-        model: input.model ? `${input.model.providerID}/${input.model.id}` : "?",
-        temperature: output?.temperature,
-        topP: output?.topP,
-        maxTokens: input.model?.limit?.output,
-      });
+    "chat.params": async (input, _output) => {
+      await log("⚙️  chat.params", {
+        agent: safeSlice(input.agent, 15),
+        model: safeSlice(input.model?.id || input.model, 30),
+      })
     },
 
     // ==================================================================
-    // 5. SYSTEM TRANSFORM — sửa system prompt trước khi gửi AI
+    // 4. SYSTEM TRANSFORM HOOK
     // ==================================================================
     "experimental.chat.system.transform": async (input, output) => {
-      if (!Array.isArray(output.system)) return;
-
-      // Demo: thêm 1 dòng nhỏ vào system prompt để xác nhận plugin hoạt động
-      const marker = "\n<!-- kuromi-plugin-opencode: demo hook active -->\n";
-      if (!output.system.some((s: string) => s.includes("kuromi-plugin-opencode"))) {
-        output.system.push(marker);
-      }
-
-      hookLog("🔄 system.transform", {
-        systemBlocks: output.system.length,
-        injected: marker.length,
-      });
+      if (!Array.isArray(output.system)) return
+      await log("🔄 system.transform", {
+        blocks: String(output.system.length),
+      })
     },
 
     // ==================================================================
-    // 6. TOOL EXECUTE BEFORE — TRƯỚC KHI tool chạy
+    // 5. TOOL EXECUTE BEFORE HOOK
     // ==================================================================
     "tool.execute.before": async (input, output) => {
-      const args = output.args || {};
-      const argKeys = Object.keys(args).join(",");
-      hookLog("⏩ tool.execute.before", {
-        tool: input.tool,
-        args: argKeys.slice(0, 100),
-      });
+      const args = (output as any)?.args || {}
+      const keys = Object.keys(args).join(",").slice(0, 80)
+      await log("⏩ tool.execute.before", {
+        tool: safeSlice(input.tool, 15),
+        args: keys,
+      })
     },
 
     // ==================================================================
-    // 7. EXPERIMENTAL SESSION COMPACTING
+    // 6. CONFIG HOOK
     // ==================================================================
-    "experimental.session.compacting": async (input, output) => {
-      hookLog("🗜️  session.compacting", {
-        contextBlocks: Array.isArray(output?.context)
-          ? output.context.length
-          : 0,
-      });
+    config: async (input) => {
+      await log("📋 config", {
+        model: safeSlice(input.model?.id, 30),
+        agent: safeSlice(input.agent?.id, 15),
+      })
     },
-  };
-};
+  }
+}
