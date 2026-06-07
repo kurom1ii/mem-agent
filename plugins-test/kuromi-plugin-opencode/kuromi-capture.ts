@@ -1,3 +1,5 @@
+/// <reference types="bun" />
+
 import type { Plugin } from "@opencode-ai/plugin"
 
 // =====================================================================
