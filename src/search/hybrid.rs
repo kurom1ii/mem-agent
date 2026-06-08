@@ -127,7 +127,7 @@ impl HybridSearch {
         for entry in entries {
             let meta = VectorMeta {
                 memory_id: entry.memory_id,
-                created_at: String::new(),
+                created_at_epoch: 0,
             };
             self.vector_store
                 .insert(entry.memory_id, entry.vector, meta)?;
@@ -179,7 +179,11 @@ mod tests {
         ];
 
         for (title, content, tags) in entries {
-            insert_memory(&conn, title, content, tags).unwrap();
+            insert_memory(
+                &conn, "manual", "change", None, "manual", "",
+                title, content, tags,
+                "[]", "[]", "[]", "[]", None,
+            ).unwrap();
         }
 
         conn

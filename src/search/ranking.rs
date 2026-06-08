@@ -56,11 +56,21 @@ pub fn rrf_fuse(
         .map(|(id, score, fts_score, vec_score)| SearchResult {
             memory: Memory {
                 id,
+                kind: "observation".to_string(),
+                observation_type: "change".to_string(),
+                session_id: None,
+                source: "manual".to_string(),
+                project: String::new(),
                 title: String::new(),
                 content: String::new(),
                 tags: String::new(),
-                created_at: String::new(),
-                updated_at: String::new(),
+                facts: "[]".to_string(),
+                concepts: "[]".to_string(),
+                files_read: "[]".to_string(),
+                files_modified: "[]".to_string(),
+                narrative: None,
+                created_at_epoch: 0,
+                updated_at_epoch: 0,
             },
             score,
             fts_score,
@@ -211,39 +221,8 @@ mod tests {
 
     #[test]
     fn test_normalize_scores_varied() {
-        let mut results = vec![
-            SearchResult {
-                memory: Memory {
-                    id: 1,
-                    title: String::new(),
-                    content: String::new(),
-                    tags: String::new(),
-                    created_at: String::new(),
-                    updated_at: String::new(),
-                },
-                score: 0.5,
-                fts_score: -3.0,
-                vector_score: 0.2,
-                snippet: String::new(),
-            },
-            SearchResult {
-                memory: Memory {
-                    id: 2,
-                    title: String::new(),
-                    content: String::new(),
-                    tags: String::new(),
-                    created_at: String::new(),
-                    updated_at: String::new(),
-                },
-                score: 0.3,
-                fts_score: -1.0,
-                vector_score: 0.8,
-                snippet: String::new(),
-            },
-        ];
-
+        let mut results = make_test_results(1, 2);
         normalize_scores(&mut results);
-
         let a = &results[0];
         let b = &results[1];
         assert!((a.fts_score - 0.0).abs() < 0.001);
@@ -256,35 +235,20 @@ mod tests {
     fn test_normalize_scores_identical() {
         let mut results = vec![
             SearchResult {
-                memory: Memory {
-                    id: 1,
-                    title: String::new(),
-                    content: String::new(),
-                    tags: String::new(),
-                    created_at: String::new(),
-                    updated_at: String::new(),
-                },
+                memory: make_test_memory(1),
                 score: 0.0,
                 fts_score: 5.0,
                 vector_score: 0.7,
                 snippet: String::new(),
             },
             SearchResult {
-                memory: Memory {
-                    id: 2,
-                    title: String::new(),
-                    content: String::new(),
-                    tags: String::new(),
-                    created_at: String::new(),
-                    updated_at: String::new(),
-                },
+                memory: make_test_memory(2),
                 score: 0.0,
                 fts_score: 5.0,
                 vector_score: 0.7,
                 snippet: String::new(),
             },
         ];
-
         normalize_scores(&mut results);
         for r in &results {
             assert!((r.fts_score - 1.0).abs() < 0.001);
@@ -297,5 +261,45 @@ mod tests {
         let mut results: Vec<SearchResult> = vec![];
         normalize_scores(&mut results);
         assert!(results.is_empty());
+    }
+
+    fn make_test_memory(id: i64) -> Memory {
+        Memory {
+            id,
+            kind: "observation".to_string(),
+            observation_type: "change".to_string(),
+            session_id: None,
+            source: "manual".to_string(),
+            project: String::new(),
+            title: String::new(),
+            content: String::new(),
+            tags: String::new(),
+            facts: "[]".to_string(),
+            concepts: "[]".to_string(),
+            files_read: "[]".to_string(),
+            files_modified: "[]".to_string(),
+            narrative: None,
+            created_at_epoch: 0,
+            updated_at_epoch: 0,
+        }
+    }
+
+    fn make_test_results(id1: i64, id2: i64) -> Vec<SearchResult> {
+        vec![
+            SearchResult {
+                memory: make_test_memory(id1),
+                score: 0.5,
+                fts_score: -3.0,
+                vector_score: 0.2,
+                snippet: String::new(),
+            },
+            SearchResult {
+                memory: make_test_memory(id2),
+                score: 0.3,
+                fts_score: -1.0,
+                vector_score: 0.8,
+                snippet: String::new(),
+            },
+        ]
     }
 }

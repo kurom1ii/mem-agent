@@ -1,9 +1,10 @@
-use crate::core::types::SearchResult;
 use crate::embed::engine::EmbeddingEngine;
 use crate::embed::tokenizer_embed::TokenizerWrapper;
 use crate::mcp::protocol::{CallToolParams, JsonRpcResponse, ToolDefinition};
-use crate::search::fts5_search::Fts5Searcher;
-use crate::search::hybrid::HybridSearch;
+use crate::search::smart::{
+    format_search_results, list_recent_memories_smart, search_memories_smart, SearchMode,
+    SearchScope,
+};
 
 pub fn list_tools_definitions() -> Vec<ToolDefinition> {
     vec![
@@ -27,6 +28,12 @@ pub fn list_tools_definitions() -> Vec<ToolDefinition> {
                         "description": "Search mode: hybrid, fts5, or vector",
                         "enum": ["hybrid", "fts5", "vector"],
                         "default": "hybrid"
+                    },
+                    "scope": {
+                        "type": "string",
+                        "description": "Result scope: auto, chat, tool, or all",
+                        "enum": ["auto", "chat", "tool", "all"],
+                        "default": "auto"
                     }
                 },
                 "required": ["query"]
@@ -49,6 +56,32 @@ pub fn list_tools_definitions() -> Vec<ToolDefinition> {
                     "tags": {
                         "type": "string",
                         "description": "Comma-separated tags"
+                    },
+                    "kind": {
+                        "type": "string",
+                        "description": "Memory kind: observation, summary, prompt, manual",
+                        "enum": ["observation", "summary", "prompt", "manual"],
+                        "default": "manual"
+                    },
+                    "type": {
+                        "type": "string",
+                        "description": "Observation type: bugfix, feature, refactor, change, discovery, decision, security_alert, security_note",
+                        "enum": ["bugfix", "feature", "refactor", "change", "discovery", "decision", "security_alert", "security_note"],
+                        "default": "change"
+                    },
+                    "session_id": {
+                        "type": "string",
+                        "description": "Session ID for grouping"
+                    },
+                    "source": {
+                        "type": "string",
+                        "description": "Memory source: opencode, claude, api, manual",
+                        "default": "manual"
+                    },
+                    "project": {
+                        "type": "string",
+                        "description": "Project path",
+                        "default": ""
                     }
                 },
                 "required": ["title", "content"]
@@ -78,6 +111,12 @@ pub fn list_tools_definitions() -> Vec<ToolDefinition> {
                         "type": "integer",
                         "description": "Max results (default 20)",
                         "default": 20
+                    },
+                    "scope": {
+                        "type": "string",
+                        "description": "List scope: all, chat, or tool",
+                        "enum": ["all", "chat", "tool"],
+                        "default": "all"
                     }
                 }
             }),
@@ -104,6 +143,94 @@ pub fn list_tools_definitions() -> Vec<ToolDefinition> {
                 "properties": {}
             }),
         },
+        ToolDefinition {
+            name: "memory_observe".into(),
+            description: "Classify a tool execution using the observer pipeline and store".into(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "kind": {
+                        "type": "string",
+                        "description": "Memory kind (default: observation)",
+                        "default": "observation"
+                    },
+                    "tool_name": {
+                        "type": "string",
+                        "description": "Name of the tool that was executed"
+                    },
+                    "tool_input": {
+                        "type": "string",
+                        "description": "Tool input/arguments JSON"
+                    },
+                    "tool_output": {
+                        "type": "string",
+                        "description": "Tool output/result"
+                    },
+                    "session_id": {
+                        "type": "string",
+                        "description": "Session ID for grouping"
+                    },
+                    "source": {
+                        "type": "string",
+                        "description": "Memory source",
+                        "default": "opencode"
+                    },
+                    "project": {
+                        "type": "string",
+                        "description": "Project path",
+                        "default": ""
+                    },
+                    "cwd": {
+                        "type": "string",
+                        "description": "Working directory",
+                        "default": "."
+                    },
+                    "user_prompt": {
+                        "type": "string",
+                        "description": "User prompt that triggered this"
+                    },
+                    "tags": {
+                        "type": "string",
+                        "description": "Comma-separated tags"
+                    },
+                    "files_read": {
+                        "type": "array",
+                        "items": { "type": "string" },
+                        "description": "Files read during tool execution"
+                    },
+                    "files_modified": {
+                        "type": "array",
+                        "items": { "type": "string" },
+                        "description": "Files modified during tool execution"
+                    }
+                },
+                "required": ["tool_name", "tool_output"]
+            }),
+        },
+        ToolDefinition {
+            name: "memory_summarize".into(),
+            description: "Summarize a session using the observer pipeline".into(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "description": "Session ID to summarize"
+                    },
+                    "project": {
+                        "type": "string",
+                        "description": "Project path",
+                        "default": ""
+                    },
+                    "source": {
+                        "type": "string",
+                        "description": "Source platform",
+                        "default": "opencode"
+                    }
+                },
+                "required": ["session_id"]
+            }),
+        },
     ]
 }
 
@@ -117,6 +244,8 @@ pub fn handle_tool_call(
         "memory_get" => handle_memory_get(params, conn),
         "memory_list" => handle_memory_list(params, conn),
         "memory_delete" => handle_memory_delete(params, conn),
+        "memory_observe" => handle_memory_observe(params, conn),
+        "memory_summarize" => handle_memory_summarize(params, conn),
         "index_stats" => handle_index_stats(conn),
         name => Err(format!("Unknown tool: {name}")),
     };
@@ -159,59 +288,12 @@ fn handle_memory_search(
         .as_str()
         .ok_or_else(|| "Missing 'query' parameter".to_string())?;
     let limit = args["limit"].as_u64().unwrap_or(10) as usize;
-    let mode = args["mode"].as_str().unwrap_or("hybrid");
+    let mode = SearchMode::parse(args["mode"].as_str().unwrap_or("hybrid"));
+    let scope = SearchScope::parse(args["scope"].as_str().unwrap_or("auto"));
 
-    match mode {
-        "fts5" => {
-            let results = build_fts5_searcher(conn)?
-                .search(conn, query, limit)
-                .map_err(|e| format!("FTS5 search error: {e}"))?;
-            Ok(format_search_results("fts5", &results))
-        }
-        "vector" => {
-            let hybrid = build_hybrid_search(conn)?;
-            if hybrid.vector_store.is_empty() {
-                return Ok(
-                    "No vectors indexed yet. Save memories after model setup or use mode=\"fts5\"."
-                        .to_string(),
-                );
-            }
-            let results = hybrid
-                .search_vector_only(conn, query, limit)
-                .map_err(|e| format!("Vector search error: {e}"))?;
-            Ok(format_search_results("vector", &results))
-        }
-        "hybrid" => match build_hybrid_search(conn) {
-            Ok(hybrid) => {
-                if hybrid.vector_store.is_empty() {
-                    let results = build_fts5_searcher(conn)?
-                        .search(conn, query, limit)
-                        .map_err(|e| format!("FTS5 fallback error: {e}"))?;
-                    Ok(format!(
-                        "Hybrid fallback: no vectors indexed yet.\n\n{}",
-                        format_search_results("fts5", &results)
-                    ))
-                } else {
-                    let results = hybrid
-                        .search(conn, query, limit)
-                        .map_err(|e| format!("Hybrid search error: {e}"))?;
-                    Ok(format_search_results("hybrid", &results))
-                }
-            }
-            Err(err) => {
-                let results = build_fts5_searcher(conn)?
-                    .search(conn, query, limit)
-                    .map_err(|e| format!("FTS5 fallback error: {e}"))?;
-                Ok(format!(
-                    "Hybrid fallback: {err}\n\n{}",
-                    format_search_results("fts5", &results)
-                ))
-            }
-        },
-        other => Err(format!(
-            "Unsupported mode '{other}'. Use one of: fts5, vector, hybrid."
-        )),
-    }
+    let response = search_memories_smart(conn, query, limit, mode, scope)
+        .map_err(|e| format!("Search error: {e}"))?;
+    Ok(format_search_results(&response))
 }
 
 fn handle_memory_add(
@@ -227,9 +309,23 @@ fn handle_memory_add(
         .as_str()
         .ok_or_else(|| "Missing 'content'".to_string())?;
     let tags = args["tags"].as_str().unwrap_or("");
+    let kind = args["kind"].as_str().unwrap_or("manual");
+    let obs_type = args["type"].as_str().unwrap_or("change");
+    let session_id = args["session_id"].as_str();
+    let source = args["source"].as_str().unwrap_or("manual");
+    let project = args["project"].as_str().unwrap_or("");
 
-    let id = crate::db::ops::insert_memory(conn, title, content, tags)
-        .map_err(|e| format!("Insert error: {e}"))?;
+    if let Some(sid) = session_id {
+        crate::db::ops::ensure_session(conn, sid, project, source)
+            .map_err(|e| format!("Session error: {e}"))?;
+    }
+
+    let id = crate::db::ops::insert_memory(
+        conn, kind, obs_type, session_id, source, project,
+        title, content, tags,
+        "[]", "[]", "[]", "[]", None,
+    )
+    .map_err(|e| format!("Insert error: {e}"))?;
 
     let combined = format!("title: {title}\ncontent: {content}");
     let vector_status = match embed_memory_document(&combined) {
@@ -264,14 +360,21 @@ fn handle_memory_list(
     let default_args = serde_json::json!({});
     let args = params.arguments.as_ref().unwrap_or(&default_args);
     let limit = args["limit"].as_u64().unwrap_or(20) as usize;
+    let scope = SearchScope::parse(args["scope"].as_str().unwrap_or("all"));
 
     let mems =
-        crate::db::ops::list_memories(conn, limit).map_err(|e| format!("List error: {e}"))?;
+        list_recent_memories_smart(conn, limit, scope).map_err(|e| format!("List error: {e}"))?;
+
     let mut output = String::new();
     for mem in &mems {
         output.push_str(&format!(
-            "[ID:{}] {} | tags: {} | updated: {}\n",
-            mem.id, mem.title, mem.tags, mem.updated_at
+            "[ID:{}] {} [kind={}] [type={}] | tags: {} | session: {}\n",
+            mem.id,
+            mem.title,
+            mem.kind,
+            mem.observation_type,
+            mem.tags,
+            mem.session_id.as_deref().unwrap_or("-"),
         ));
     }
     Ok(output.trim().to_string())
@@ -296,30 +399,102 @@ fn handle_memory_delete(
     }
 }
 
+fn handle_memory_observe(
+    params: &CallToolParams,
+    conn: &rusqlite::Connection,
+) -> Result<String, String> {
+    let default_args = serde_json::json!({});
+    let args = params.arguments.as_ref().unwrap_or(&default_args);
+    let kind = args["kind"].as_str().unwrap_or("observation");
+    let tool_name = args["tool_name"]
+        .as_str()
+        .ok_or_else(|| "Missing 'tool_name'".to_string())?;
+    let tool_input = args["tool_input"].as_str().unwrap_or("");
+    let tool_output = args["tool_output"]
+        .as_str()
+        .ok_or_else(|| "Missing 'tool_output'".to_string())?;
+    let session_id = args["session_id"].as_str();
+    let source = args["source"].as_str().unwrap_or("opencode");
+    let project = args["project"].as_str().unwrap_or("");
+    let cwd = args["cwd"].as_str().unwrap_or(".");
+    let user_prompt = args["user_prompt"].as_str();
+    let tags = args["tags"].as_str().unwrap_or("");
+
+    let files_read: Vec<String> = args["files_read"]
+        .as_array()
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect()
+        })
+        .unwrap_or_default();
+
+    let files_modified: Vec<String> = args["files_modified"]
+        .as_array()
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect()
+        })
+        .unwrap_or_default();
+
+    let now = crate::db::ops::get_epoch_now();
+    let timestamp = chrono::DateTime::from_timestamp(now, 0)
+        .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
+        .unwrap_or_else(|| "unknown".to_string());
+
+    let result = crate::observer::observe_and_store(
+        conn, kind, session_id, source, project,
+        tool_name, tool_input, tool_output, cwd, &timestamp,
+        user_prompt, tags,
+        &files_read, &files_modified,
+    )
+    .map_err(|e| format!("Observer error: {e}"))?;
+
+    let combined = format!("title: {tool_name}\ncontent: {tool_input}");
+    let vector_status = match embed_memory_document(&combined) {
+        Ok(vector) => match crate::db::ops::insert_vector(conn, result, &vector) {
+            Ok(()) => "vector indexed".to_string(),
+            Err(e) => format!("vector insert failed: {e}"),
+        },
+        Err(e) => format!("vector skipped: {e}"),
+    };
+
+    Ok(format!(
+        "Observed and stored: memory ID {result} ({vector_status})"
+    ))
+}
+
+fn handle_memory_summarize(
+    params: &CallToolParams,
+    conn: &rusqlite::Connection,
+) -> Result<String, String> {
+    let default_args = serde_json::json!({});
+    let args = params.arguments.as_ref().unwrap_or(&default_args);
+    let session_id = args["session_id"]
+        .as_str()
+        .ok_or_else(|| "Missing 'session_id'".to_string())?;
+    let project = args["project"].as_str().unwrap_or("");
+    let source = args["source"].as_str().unwrap_or("opencode");
+
+    match crate::observer::summarize_session(conn, session_id, project, source)
+        .map_err(|e| format!("Summarize error: {e}"))?
+    {
+        Some(id) => Ok(format!("Summary stored: memory ID {id}")),
+        None => Ok("No memories to summarize in this session".into()),
+    }
+}
+
 fn handle_index_stats(conn: &rusqlite::Connection) -> Result<String, String> {
     let stats = crate::db::ops::get_stats(conn).map_err(|e| format!("Stats error: {e}"))?;
+    let by_kind = crate::db::ops::get_stats_by_kind(conn).unwrap_or_default();
     Ok(serde_json::to_string_pretty(&serde_json::json!({
         "memory_count": stats.memory_count,
         "vector_count": stats.vector_count,
+        "session_count": stats.session_count,
+        "by_kind": by_kind.into_iter().map(|(k, c)| serde_json::json!({ "kind": k, "count": c })).collect::<Vec<_>>(),
     }))
     .unwrap_or_else(|_| format!("{stats:?}")))
-}
-
-fn build_fts5_searcher(conn: &rusqlite::Connection) -> Result<Fts5Searcher, String> {
-    let mut searcher = Fts5Searcher::new();
-    searcher
-        .build_index(conn)
-        .map_err(|e| format!("BM25 index build error: {e}"))?;
-    Ok(searcher)
-}
-
-fn build_hybrid_search(conn: &rusqlite::Connection) -> Result<HybridSearch, String> {
-    let embed = load_embedding_engine()?;
-    let mut hybrid = HybridSearch::new(embed);
-    hybrid
-        .build_indices(conn)
-        .map_err(|e| format!("Index build error: {e}"))?;
-    Ok(hybrid)
 }
 
 fn load_embedding_engine() -> Result<EmbeddingEngine, String> {
@@ -344,37 +519,4 @@ fn embed_memory_document(text: &str) -> Result<Vec<f32>, String> {
     load_embedding_engine()?
         .embed_document(text)
         .map_err(|e| format!("Embedding failed: {e}"))
-}
-
-fn format_search_results(mode: &str, results: &[SearchResult]) -> String {
-    if results.is_empty() {
-        return format!("No results found in {mode} mode.");
-    }
-
-    let mut output = String::new();
-    output.push_str(&format!(
-        "Search mode: {mode}\nResults: {}\n\n",
-        results.len()
-    ));
-
-    for result in results {
-        let preview = if result.snippet.trim().is_empty() {
-            result.memory.content.chars().take(200).collect::<String>()
-        } else {
-            result.snippet.clone()
-        };
-
-        output.push_str(&format!(
-            "[ID:{}] {} | score={:.4} | fts={:.4} | vector={:.4}\n  tags={}\n  {}\n\n",
-            result.memory.id,
-            result.memory.title,
-            result.score,
-            result.fts_score,
-            result.vector_score,
-            result.memory.tags,
-            preview,
-        ));
-    }
-
-    output.trim().to_string()
 }

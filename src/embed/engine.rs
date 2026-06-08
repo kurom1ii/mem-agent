@@ -133,19 +133,13 @@ impl EmbeddingEngine {
     }
 
     pub fn embed_query_batch(&self, texts: &[&str]) -> Result<Vec<Vec<f32>>, String> {
-        let prefixed: Vec<String> = texts
-            .iter()
-            .map(|t| format!("{QUERY_PREFIX}{t}"))
-            .collect();
+        let prefixed: Vec<String> = texts.iter().map(|t| format!("{QUERY_PREFIX}{t}")).collect();
         let refs: Vec<&str> = prefixed.iter().map(|s| s.as_str()).collect();
         self.embed_batch(&refs)
     }
 
     pub fn embed_document_batch(&self, texts: &[&str]) -> Result<Vec<Vec<f32>>, String> {
-        let prefixed: Vec<String> = texts
-            .iter()
-            .map(|t| format!("{DOC_PREFIX}{t}"))
-            .collect();
+        let prefixed: Vec<String> = texts.iter().map(|t| format!("{DOC_PREFIX}{t}")).collect();
         let refs: Vec<&str> = prefixed.iter().map(|s| s.as_str()).collect();
         self.embed_batch(&refs)
     }

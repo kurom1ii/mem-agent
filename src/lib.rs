@@ -6,6 +6,7 @@ pub mod db;
 pub mod download;
 pub mod embed;
 pub mod mcp;
+pub mod observer;
 pub mod persist;
 pub mod search;
 pub mod simulation;

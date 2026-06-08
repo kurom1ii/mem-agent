@@ -21,6 +21,6 @@ Các bước:
 6. Xác nhận với người dùng rằng đã lưu thành công, kèm ID của memory.
 
 Nếu `memory_add` không khả dụng:
-1. Chạy `mem-agent download` để tải model ONNX
+1. Chạy `mem-agent download` để tải model ONNX vào `plugins/opencode/models/embeddinggemma-300m-ONNX`
 2. Build `cargo build --release`
 3. Kiểm tra `mem-agent` có trong PATH không

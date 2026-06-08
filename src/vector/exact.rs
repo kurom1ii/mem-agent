@@ -78,7 +78,7 @@ mod tests {
         let mut store = VectorStore::new(4);
         let meta = VectorMeta {
             memory_id: 0,
-            created_at: String::new(),
+            created_at_epoch: 0,
         };
 
         store
@@ -87,7 +87,7 @@ mod tests {
 
         let meta = VectorMeta {
             memory_id: 1,
-            created_at: String::new(),
+            created_at_epoch: 0,
         };
         store
             .insert(2, vec![0.0, 1.0, 0.0, 0.0], meta.clone())
@@ -95,7 +95,7 @@ mod tests {
 
         let meta = VectorMeta {
             memory_id: 2,
-            created_at: String::new(),
+            created_at_epoch: 0,
         };
         store.insert(3, vec![0.5, 0.0, 0.0, 0.0], meta).unwrap();
 

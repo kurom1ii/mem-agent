@@ -67,7 +67,7 @@ tail -f /home/kuromi/work/mywork/mem-agent/plugins/opencode/log.log
 
 ## Features
 
-- **Auto capture**: User prompts, assistant metadata, tool outcomes, patches, and step-finish events are auto-saved into mem-agent
+- **Auto capture**: User prompts, full assistant replies, and full tool outcomes are auto-saved into mem-agent
 - **Auto recall**: Recent memories, prompt-based recall, and file-based recall are injected into the system prompt
 - **File tracking**: Tracks edited files for recall enrichment
 - **5 slash commands**: `/remember`, `/recall`, `/forget`, `/memories`, `/memstats`

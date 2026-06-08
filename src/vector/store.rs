@@ -106,7 +106,7 @@ mod tests {
         let vec = vec![1.0, 2.0, 3.0, 4.0];
         let meta = VectorMeta {
             memory_id: 1,
-            created_at: "2024-01-01".into(),
+            created_at_epoch: 0,
         };
         store.insert(1, vec.clone(), meta).unwrap();
         assert_eq!(store.len(), 1);
@@ -118,7 +118,7 @@ mod tests {
         let mut store = VectorStore::new(3);
         let meta = VectorMeta {
             memory_id: 42,
-            created_at: "2024-01-01".into(),
+            created_at_epoch: 0,
         };
         store.insert(42, vec![0.0; 3], meta).unwrap();
         assert!(store.remove(42));
@@ -131,7 +131,7 @@ mod tests {
         let mut store = VectorStore::new(3);
         let meta = VectorMeta {
             memory_id: 1,
-            created_at: "".into(),
+            created_at_epoch: 0,
         };
         assert!(store.insert(1, vec![0.0; 5], meta).is_err());
     }

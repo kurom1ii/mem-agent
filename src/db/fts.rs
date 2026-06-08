@@ -38,7 +38,8 @@ pub fn fts5_search_raw(conn: &Connection, query: &str, limit: usize) -> Result<V
          FROM memories_fts
          WHERE memories_fts MATCH ?1
          ORDER BY score
-         LIMIT ?2".to_string();
+         LIMIT ?2"
+        .to_string();
 
     let mut stmt = conn.prepare(&sql)?;
 
@@ -75,6 +76,7 @@ pub fn fts5_stats(conn: &Connection) -> Result<(usize, usize)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::db::ops::insert_memory;
     use crate::db::schema::init_db;
     use rusqlite::Connection;
 
@@ -83,27 +85,43 @@ mod tests {
         conn.execute_batch("PRAGMA foreign_keys=ON;").unwrap();
         init_db(&conn).unwrap();
 
-        conn.execute(
-            "INSERT INTO memories (title, content, tags) VALUES (?1, ?2, ?3)",
-            params![
-                "Rust Programming",
-                "Rust is a systems programming language",
-                "rust"
-            ],
+        insert_memory(
+            &conn,
+            "observation",
+            "change",
+            None,
+            "manual",
+            "",
+            "Rust Programming",
+            "Rust is a systems programming language",
+            "rust",
+            "[]", "[]", "[]", "[]", None,
         )
         .unwrap();
-        conn.execute(
-            "INSERT INTO memories (title, content, tags) VALUES (?1, ?2, ?3)",
-            params!["Python Guide", "Python is great for data science", "python"],
+        insert_memory(
+            &conn,
+            "observation",
+            "change",
+            None,
+            "manual",
+            "",
+            "Python Guide",
+            "Python is great for data science",
+            "python",
+            "[]", "[]", "[]", "[]", None,
         )
         .unwrap();
-        conn.execute(
-            "INSERT INTO memories (title, content, tags) VALUES (?1, ?2, ?3)",
-            params![
-                "Async Rust",
-                "Rust async programming with tokio",
-                "rust,async"
-            ],
+        insert_memory(
+            &conn,
+            "observation",
+            "change",
+            None,
+            "manual",
+            "",
+            "Async Rust",
+            "Rust async programming with tokio",
+            "rust,async",
+            "[]", "[]", "[]", "[]", None,
         )
         .unwrap();
 

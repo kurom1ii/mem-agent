@@ -17,16 +17,16 @@ const SAMPLE_TITLES: &[&str] = &[
 ];
 
 const SAMPLE_CONTENTS: &[&str] = &[
-    "Tokio provides async runtime for Rust. Use async/await for non-blocking I/O operations. The runtime handles task scheduling and execution efficiently across multiple threads.",
-    "SQLite with WAL mode provides better concurrent read performance. Use prepared statements to avoid query parsing overhead. Index columns used in WHERE clauses for faster lookups.",
-    "A typical ML pipeline includes data ingestion, preprocessing, feature engineering, model training, evaluation, and deployment. Use Apache Airflow or Prefect for orchestration.",
-    "WebAssembly enables running code at near-native speed in browsers. Rust has first-class Wasm support through wasm-pack. Memory is managed through linear memory model.",
-    "CAP theorem states you can only have two of Consistency, Availability, and Partition Tolerance. Eventual consistency models trade off strong consistency for availability.",
-    "Converting large TypeScript codebases requires incremental migration. Use strict mode gradually starting with new files. Leverage type inference to reduce annotation burden.",
-    "Kubernetes deployments need pod resource limits, health checks, rolling updates, and config maps. Use Helm charts for templating and versioning infrastructure.",
-    "B-tree indexes are the default in PostgreSQL. Consider BRIN indexes for large sequential data. Partial indexes reduce size for filtered queries. Use EXPLAIN ANALYZE to verify.",
-    "React.memo prevents unnecessary re-renders. useMemo caches expensive computations. useCallback stabilizes function references. Virtual lists handle large datasets efficiently.",
-    "Multi-stage builds separate build and runtime environments. Copy only production artifacts to final image. Use distroless base images for minimal attack surface.",
+    "Tokio provides async runtime for Rust. Use async/await for non-blocking I/O operations.",
+    "SQLite with WAL mode provides better concurrent read performance.",
+    "A typical ML pipeline includes data ingestion, preprocessing, feature engineering, model training.",
+    "WebAssembly enables running code at near-native speed in browsers.",
+    "CAP theorem states you can only have two of Consistency, Availability, and Partition Tolerance.",
+    "Converting large TypeScript codebases requires incremental migration.",
+    "Kubernetes deployments need pod resource limits, health checks, rolling updates.",
+    "B-tree indexes are the default in PostgreSQL. Consider BRIN indexes for large sequential data.",
+    "React.memo prevents unnecessary re-renders. useMemo caches expensive computations.",
+    "Multi-stage builds separate build and runtime environments.",
 ];
 
 const SAMPLE_TAGS: &[&str] = &[
@@ -51,7 +51,11 @@ pub fn generate_samples(conn: &Connection, count: usize) -> Result<Vec<i64>> {
         let content = SAMPLE_CONTENTS[idx];
         let tags = SAMPLE_TAGS[idx];
 
-        let id = ops::insert_memory(conn, &title, content, tags)?;
+        let id = ops::insert_memory(
+            conn, "manual", "change", None, "simulation", "",
+            &title, content, tags,
+            "[]", "[]", "[]", "[]", None,
+        )?;
         ids.push(id);
     }
 
@@ -71,7 +75,11 @@ pub fn generate_random_samples(conn: &Connection, count: usize) -> Result<Vec<i6
         let content = SAMPLE_CONTENTS[ci];
         let tags = SAMPLE_TAGS[gi];
 
-        let id = ops::insert_memory(conn, &title, content, tags)?;
+        let id = ops::insert_memory(
+            conn, "manual", "change", None, "simulation", "",
+            &title, content, tags,
+            "[]", "[]", "[]", "[]", None,
+        )?;
         ids.push(id);
     }
 

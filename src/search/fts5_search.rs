@@ -158,7 +158,11 @@ mod tests {
         ];
 
         for (title, content, tags) in entries {
-            insert_memory(&conn, title, content, tags).unwrap();
+            insert_memory(
+                &conn, "manual", "change", None, "manual", "",
+                title, content, tags,
+                "[]", "[]", "[]", "[]", None,
+            ).unwrap();
         }
 
         conn

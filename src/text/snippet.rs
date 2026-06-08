@@ -32,8 +32,9 @@ pub fn generate_snippet(content: &str, query: &str, window: usize) -> String {
         .min();
 
     match best_offset {
-        Some(pos) => {
-            let snippet = extract_window(content, pos, window);
+        Some(pos_bytes) => {
+            let match_char_idx = content_lower[..pos_bytes].chars().count();
+            let snippet = extract_window(content, match_char_idx, window);
             highlight(&snippet, &query_tokens, window)
         }
         None => {
@@ -74,15 +75,18 @@ fn extract_window(content: &str, match_pos: usize, window: usize) -> String {
 
 fn highlight(snippet: &str, query_tokens: &[String], _window: usize) -> String {
     let mut result = String::new();
-    let lower = snippet.to_lowercase();
     let chars: Vec<char> = snippet.chars().collect();
+    let lower_chars: Vec<char> = snippet.to_lowercase().chars().collect();
+    let token_chars: Vec<Vec<char>> = query_tokens
+        .iter()
+        .map(|token| token.chars().collect())
+        .collect();
     let mut i = 0;
 
     while i < chars.len() {
         let mut matched = false;
-        for token in query_tokens {
-            let rem = &lower[i..];
-            if rem.starts_with(token.as_str()) {
+        for token in &token_chars {
+            if lower_chars[i..].starts_with(token.as_slice()) {
                 // Check token boundary
                 let after_end = i + token.len();
                 let is_start_boundary = i == 0 || !chars[i - 1].is_alphanumeric();
@@ -167,5 +171,12 @@ mod tests {
         let content = "A long document with many words at the start and the target at the very end";
         let snippet = generate_snippet(content, "target", 40);
         assert!(snippet.contains("**target**"));
+    }
+
+    #[test]
+    fn test_snippet_unicode_safe_vietnamese() {
+        let content = "lần trước tôi chat nội dung gì đó bằng tiếng Việt có dấu";
+        let snippet = generate_snippet(content, "lần trước chat nội dung", 40);
+        assert!(!snippet.is_empty());
     }
 }
