@@ -102,9 +102,8 @@ export const CACHE_TTL_MS         = 30_000;
 export const AUTO_SAVE   = process.env.MEMAGENT_AUTO_SAVE   !== "0";
 export const AUTO_RECALL = process.env.MEMAGENT_AUTO_RECALL !== "0";
 
-const REPO_ROOT = path.resolve(
-  path.dirname(new URL(import.meta.url).pathname), "..", "..", "..",
-);
+const PLUGIN_DIR = new URL(".", import.meta.url).pathname;
+const REPO_ROOT   = path.resolve(PLUGIN_DIR, "..", "..");  // plugins/opencode → repo root
 
 // ─── System Instructions ───────────────────────────────
 
